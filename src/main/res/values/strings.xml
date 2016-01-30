@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- General -->
+    <string name="appName">Langbook</string>
+
+    <!-- Menu options -->
+    <string name="newWordOption">New word</string>
+</resources>
