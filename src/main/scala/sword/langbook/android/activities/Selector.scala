@@ -6,8 +6,9 @@ import android.os.Bundle
 import android.support.v7.widget.Toolbar
 import android.view._
 import android.widget.{TextView, BaseAdapter, ListView, AdapterView}
-import sword.db.MemoryStorageManager
+import sword.db._
 import sword.langbook.android.R
+import sword.langbook.android.db.SQLiteStorageManager
 import sword.langbook.db.LinkedStorageManager
 
 object Selector {
@@ -24,11 +25,11 @@ object Selector {
 
 class Selector extends Activity with Toolbar.OnMenuItemClickListener with AdapterView.OnItemClickListener {
 
-  lazy val linkedDb = new LinkedStorageManager(defs => new MemoryStorageManager(defs))
+  lazy val linkedDb = new LinkedStorageManager(defs => new SQLiteStorageManager(Selector.this, defs))
   lazy val listView = findViewById(R.id.listView).asInstanceOf[ListView]
 
   class Adapter extends BaseAdapter {
-    lazy val items = linkedDb.words.toList
+    lazy val items = linkedDb.concepts.values.toList
 
     override def getItemId(position: Int) = position
     override def getCount = items.size
@@ -40,12 +41,10 @@ class Selector extends Activity with Toolbar.OnMenuItemClickListener with Adapte
 
       val item = getItem(position)
       val textView = view.findViewById(R.id.entryCaption).asInstanceOf[TextView]
-      textView.setText(item._2.toString)
+      textView.setText(item.hint)
       view
     }
   }
-
-  def updateAdapter() = listView.setAdapter(new Adapter)
 
   def updateMenu(menu :Menu) = {
     menu.clear()
@@ -55,8 +54,23 @@ class Selector extends Activity with Toolbar.OnMenuItemClickListener with Adapte
   override def onCreate(savedInstanceState :Bundle) = {
     super.onCreate(savedInstanceState)
     setContentView(R.layout.selector)
+
+    // Temporally we add some concepts to test
+    if ((new Adapter).getCount == 0) {
+      def insertConcept(hint :String) = {
+        linkedDb.storageManager.insert(new Register {
+          override val definition = sword.langbook.db.registers.Concept
+          override val fields = List(CharSequenceField(hint))
+        })
+      }
+
+      insertConcept("Concept 1")
+      insertConcept("Concept 2")
+      insertConcept("Concept 3")
+    }
+
     listView.setOnItemClickListener(this)
-    updateAdapter()
+    listView.setAdapter(new Adapter)
 
     val toolBar = findViewById(R.id.toolBar).asInstanceOf[Toolbar]
     toolBar.setTitle(R.string.appName)
