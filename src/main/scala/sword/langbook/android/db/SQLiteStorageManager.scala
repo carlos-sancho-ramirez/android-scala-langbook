@@ -5,6 +5,7 @@ import android.database.Cursor
 import android.database.sqlite.{SQLiteDatabase, SQLiteOpenHelper}
 import sword.db.Register.CollectionId
 import sword.db._
+import sword.langbook.db.registers.ConceptReferenceField
 
 import scala.collection.mutable.ListBuffer
 
@@ -45,6 +46,19 @@ class SQLiteStorageManager(context :Context, override val registerDefinitions :S
 
   override def onCreate(db: SQLiteDatabase): Unit = {
     createTables(db)
+
+    // As a temporal solution, we add some data to the data base
+    import sword.langbook.db.registers
+
+    def insertConcept(hint :String) = {
+      insert(db, new Register {
+        override val definition = registers.Concept
+        override val fields = List(CharSequenceField(hint))
+      })
+    }
+
+    insert(db, registers.Language(insertConcept("English").get))
+    insert(db, registers.Alphabet(insertConcept("English alphabet").get))
   }
 
   override def onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int): Unit = {
@@ -133,17 +147,13 @@ class SQLiteStorageManager(context :Context, override val registerDefinitions :S
   }
 
   private def insert(db :SQLiteDatabase, register: Register): Option[Key] = {
-    try {
-      val regDef = register.definition
-      val keys = regDef.fields.map(fieldName(regDef,_)).mkString(", ")
-      val values = register.fields.map(sqlValue).mkString(", ")
-      val query = s"INSERT INTO ${tableName(register)} ($keys) VALUES ($values)"
-      logi(s"Executing query: $query")
-      db.execSQL(query)
-      find(db, register).lastOption
-    } finally {
-      db.close()
-    }
+    val regDef = register.definition
+    val keys = regDef.fields.map(fieldName(regDef,_)).mkString(", ")
+    val values = register.fields.map(sqlValue).mkString(", ")
+    val query = s"INSERT INTO ${tableName(register)} ($keys) VALUES ($values)"
+    logi(s"Executing query: $query")
+    db.execSQL(query)
+    find(db, register).lastOption
   }
 
   override def insert(register: Register): Option[Key] = {

@@ -55,20 +55,6 @@ class Selector extends Activity with Toolbar.OnMenuItemClickListener with Adapte
     super.onCreate(savedInstanceState)
     setContentView(R.layout.selector)
 
-    // Temporally we add some concepts to test
-    if ((new Adapter).getCount == 0) {
-      def insertConcept(hint :String) = {
-        linkedDb.storageManager.insert(new Register {
-          override val definition = sword.langbook.db.registers.Concept
-          override val fields = List(CharSequenceField(hint))
-        })
-      }
-
-      insertConcept("Concept 1")
-      insertConcept("Concept 2")
-      insertConcept("Concept 3")
-    }
-
     listView.setOnItemClickListener(this)
     listView.setAdapter(new Adapter)
 
