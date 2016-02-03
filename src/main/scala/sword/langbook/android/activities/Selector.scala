@@ -51,12 +51,16 @@ class Selector extends Activity with Toolbar.OnMenuItemClickListener with Adapte
     getMenuInflater.inflate(R.menu.selector, menu)
   }
 
+  def invalidateAdapter() :Unit = {
+    listView.setAdapter(new Adapter)
+  }
+
   override def onCreate(savedInstanceState :Bundle) = {
     super.onCreate(savedInstanceState)
     setContentView(R.layout.selector)
 
     listView.setOnItemClickListener(this)
-    listView.setAdapter(new Adapter)
+    invalidateAdapter()
 
     val toolBar = findViewById(R.id.toolBar).asInstanceOf[Toolbar]
     toolBar.setTitle(R.string.appName)
@@ -67,7 +71,7 @@ class Selector extends Activity with Toolbar.OnMenuItemClickListener with Adapte
   override def onMenuItemClick(item: MenuItem) = {
     item.getItemId match {
       case R.id.newWordOption =>
-        // TODO: Including the WordEditor and open it from here
+        WordEditor.openWith(this, RequestCodes.newWord)
         true
       case _ => false
     }
@@ -75,5 +79,12 @@ class Selector extends Activity with Toolbar.OnMenuItemClickListener with Adapte
 
   override def onItemClick(parent: AdapterView[_], view: View, position: Int, id: Long): Unit = {
     // TODO: To be implemented to open the word details
+  }
+
+  override def onActivityResult(requestCode :Int, resultCode :Int, data :Intent) :Unit = {
+    requestCode match {
+      case RequestCodes.newWord => if (resultCode == Activity.RESULT_OK) invalidateAdapter()
+      case _ => super.onActivityResult(requestCode, resultCode, data)
+    }
   }
 }

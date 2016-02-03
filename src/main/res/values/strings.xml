@@ -3,6 +3,10 @@
     <!-- General -->
     <string name="appName">Langbook</string>
 
+    <!-- Word editor -->
+    <string name="wordEditorFieldHint">Type the new word</string>
+    <string name="wordEditorSaveButton">Save</string>
+
     <!-- Menu options -->
     <string name="newWordOption">New word</string>
 </resources>
