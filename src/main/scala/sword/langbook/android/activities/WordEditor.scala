@@ -5,11 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.text.TextUtils
 import android.view.View
-import android.widget.EditText
-import sword.langbook.android.{TypedFindView, TR, R}
-import sword.langbook.android.TypedResource.TypedActivity
-import sword.langbook.android.db.SQLiteStorageManager
-import sword.langbook.db.LinkedStorageManager
+import sword.langbook.android.{TR, R}
 
 object WordEditor {
   private val className = "sword.langbook.android.activities.WordEditor"
@@ -23,10 +19,7 @@ object WordEditor {
   }
 }
 
-class WordEditor extends Activity with TypedFindView with View.OnClickListener {
-
-  // TODO: THis should be centralised as Selector defines the same
-  lazy val linkedDb = new LinkedStorageManager(defs => new SQLiteStorageManager(WordEditor.this, defs))
+class WordEditor extends BaseActivity with View.OnClickListener {
 
   override def onCreate(savedInstanceState :Bundle) :Unit = {
     super.onCreate(savedInstanceState)

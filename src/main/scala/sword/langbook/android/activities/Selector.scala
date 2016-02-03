@@ -5,12 +5,8 @@ import android.content.Intent
 import android.os.Bundle
 import android.support.v7.widget.Toolbar
 import android.view._
-import android.widget.{TextView, BaseAdapter, ListView, AdapterView}
-import sword.db._
-import sword.langbook.android.{TypedFindView, TR, R}
-import sword.langbook.android.TypedResource.TypedActivity
-import sword.langbook.android.db.SQLiteStorageManager
-import sword.langbook.db.LinkedStorageManager
+import android.widget.{TextView, BaseAdapter, AdapterView}
+import sword.langbook.android.{TR, R}
 
 object Selector {
   private val className = "sword.langbook.android.activities.Selector"
@@ -24,9 +20,8 @@ object Selector {
   }
 }
 
-class Selector extends Activity with TypedFindView with Toolbar.OnMenuItemClickListener with AdapterView.OnItemClickListener {
+class Selector extends BaseActivity with Toolbar.OnMenuItemClickListener with AdapterView.OnItemClickListener {
 
-  lazy val linkedDb = new LinkedStorageManager(defs => new SQLiteStorageManager(Selector.this, defs))
   lazy val listView = findView(TR.listView)
 
   class Adapter extends BaseAdapter {

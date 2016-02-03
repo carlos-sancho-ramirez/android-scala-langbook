@@ -9,6 +9,7 @@
         android:targetSdkVersion="23"/>
 
     <application
+        android:name=".LangbookApplication"
         android:label="@string/appName"
         android:theme="@style/AppTheme"
         android:icon="@drawable/ic_launcher"
