@@ -6,7 +6,8 @@ import android.os.Bundle
 import android.text.TextUtils
 import android.view.View
 import android.widget.EditText
-import sword.langbook.android.R
+import sword.langbook.android.{TypedFindView, TR, R}
+import sword.langbook.android.TypedResource.TypedActivity
 import sword.langbook.android.db.SQLiteStorageManager
 import sword.langbook.db.LinkedStorageManager
 
@@ -22,7 +23,7 @@ object WordEditor {
   }
 }
 
-class WordEditor extends Activity with View.OnClickListener {
+class WordEditor extends Activity with TypedFindView with View.OnClickListener {
 
   // TODO: THis should be centralised as Selector defines the same
   lazy val linkedDb = new LinkedStorageManager(defs => new SQLiteStorageManager(WordEditor.this, defs))
@@ -35,7 +36,7 @@ class WordEditor extends Activity with View.OnClickListener {
   }
 
   override def onClick(v: View): Unit = {
-    val word = findViewById(R.id.wordField).asInstanceOf[EditText].getText.toString
+    val word = findView(TR.wordField).getText.toString
 
     // TODO: This has to be changed to include words instead of concepts
     if (!TextUtils.isEmpty(word)) {
