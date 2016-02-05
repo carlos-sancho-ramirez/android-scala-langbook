@@ -5,7 +5,6 @@ import android.database.Cursor
 import android.database.sqlite.{SQLiteDatabase, SQLiteOpenHelper}
 import sword.db.Register.CollectionId
 import sword.db._
-import sword.langbook.db.registers.ConceptReferenceField
 
 import scala.collection.mutable.ListBuffer
 
@@ -13,6 +12,7 @@ object SQLiteStorageManager {
   val dbName = "LanguageDb"
   val currentDbVersion = 4
   val idKey = "id"
+  val collKey = "coll"
 }
 
 class SQLiteStorageManager(context :Context, override val registerDefinitions :Seq[RegisterDefinition])
@@ -30,14 +30,19 @@ class SQLiteStorageManager(context :Context, override val registerDefinitions :S
   private def createTables(db :SQLiteDatabase) = {
     for (regDef <- registerDefinitions) {
       val idKey = SQLiteStorageManager.idKey
-      val columns = regDef.fields.map { fieldDef =>
+      val fields = regDef.fields.map { fieldDef =>
         val sqlType = fieldDef match {
           case _: CharSequenceField => "TEXT"
           case _ => "INTEGER"
         }
 
         s"${fieldName(regDef, fieldDef)} $sqlType"
-      }.mkString(", ")
+      }
+      val columns = (regDef match {
+        case _:CollectibleRegisterDefinition => Seq(s"${SQLiteStorageManager.collKey} INTEGER") ++ fields
+        case _ => fields
+      }).mkString(", ")
+
       val query = s"CREATE TABLE IF NOT EXISTS ${tableName(regDef)} ($idKey INTEGER PRIMARY KEY AUTOINCREMENT, $columns)"
       logi(s"Executing SQLite query: $query")
       db.execSQL(query)
@@ -120,7 +125,8 @@ class SQLiteStorageManager(context :Context, override val registerDefinitions :S
       case f:UnicodeField => f.value.toString
       case f:CharSequenceField => s"'${f.value}'"
       case f:ForeignKeyField => f.key.index.toString
-      case _ => throw new UnsupportedOperationException("Undefined field definition")
+      case f:CollectionReferenceField => f.collectionId.toString
+      case f => throw new UnsupportedOperationException(s"Undefined field definition $f")
     }
   }
 
@@ -156,8 +162,17 @@ class SQLiteStorageManager(context :Context, override val registerDefinitions :S
     find(db, register).lastOption
   }
 
+  private def insert(db :SQLiteDatabase, coll :Register.CollectionId, register: Register): Unit = {
+    val regDef = register.definition
+    val keys = regDef.fields.map(fieldName(regDef,_)).mkString(", ")
+    val values = register.fields.map(sqlValue).mkString(", ")
+    val query = s"INSERT INTO ${tableName(register)} (${SQLiteStorageManager.collKey}, $keys) VALUES ($coll, $values)"
+    logi(s"Executing query: $query")
+    db.execSQL(query)
+  }
+
   override def insert(register: Register): Option[Key] = {
-    val db = getReadableDatabase
+    val db = getWritableDatabase
     try {
       insert(db, register)
     } finally {
@@ -165,7 +180,39 @@ class SQLiteStorageManager(context :Context, override val registerDefinitions :S
     }
   }
 
-  override def insert(registers: Traversable[Register]): Option[CollectionId] = ???
+  override def insert(registers: Traversable[Register]): Option[CollectionId] = {
+    val definitions = registers.map(_.definition).toSet
+    if (definitions.size != 1) {
+      throw new UnsupportedOperationException("Unable to insert collections for registers with different definitions")
+    }
+
+    if (!definitions.head.isInstanceOf[CollectibleRegisterDefinition]) {
+      throw new UnsupportedOperationException("Unable to insert collections for non-collectible registers")
+    }
+
+    val db = getWritableDatabase
+    try {
+      var collId = 1
+      val cursor = db.query(tableName(definitions.head), Array(SQLiteStorageManager.collKey), null, null, null, null, null, null)
+      if (cursor != null) try {
+        if (cursor.getCount > 0 && cursor.moveToFirst()) {
+          do {
+            val thisCollId = cursor.getInt(0)
+            if (thisCollId >= collId) collId = thisCollId + 1
+          } while(cursor.moveToNext())
+        }
+      } finally {
+        cursor.close()
+      }
+
+      for (register <- registers) {
+        insert(db, collId, register)
+      }
+      Some(collId)
+    } finally {
+      db.close()
+    }
+  }
 
   private def keysFor(db :SQLiteDatabase, regDef :RegisterDefinition) :Set[Key] = {
     val cursor = db.query(tableName(regDef), Array(SQLiteStorageManager.idKey), null, null,
