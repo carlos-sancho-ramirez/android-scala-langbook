@@ -5,8 +5,9 @@ import android.content.Intent
 import android.os.Bundle
 import android.support.v7.widget.Toolbar
 import android.view._
-import android.widget.{TextView, BaseAdapter, AdapterView}
+import android.widget.{BaseAdapter, AdapterView}
 import sword.langbook.android.{TR, R}
+import sword.langbook.android.TypedResource._
 
 object Selector {
   private val className = "sword.langbook.android.activities.Selector"
@@ -42,7 +43,7 @@ class Selector extends BaseActivity with Toolbar.OnMenuItemClickListener with Ad
     override def getView(position: Int, convertView: View, parent: ViewGroup) = {
       val view = if (convertView != null) convertView
       else LayoutInflater.from(parent.getContext).inflate(R.layout.selector_entry, parent, false)
-      view.findViewById(R.id.entryCaption).asInstanceOf[TextView].setText(getItem(position))
+      view.findView(TR.entryCaption).setText(getItem(position))
       view
     }
   }
