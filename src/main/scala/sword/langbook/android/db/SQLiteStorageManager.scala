@@ -84,6 +84,10 @@ class SQLiteStorageManager(context :Context, override val registerDefinitions :S
           override val key = obtainKey(f.target, 0, value.toInt)
           override val definition = f
         }
+        case f:CollectionReferenceFieldDefinition => new CollectionReferenceField {
+          override val collectionId = value.toInt
+          override val definition = f
+        }
         case _ => throw new UnsupportedOperationException("Undefined field definition")
       }
     }
@@ -246,5 +250,27 @@ class SQLiteStorageManager(context :Context, override val registerDefinitions :S
 
   override def replace(register: Register, key: Key): Boolean = ???
   override def delete(key: Key): Boolean = ???
-  override def getKeysForCollection(registerDefinition: CollectibleRegisterDefinition, id: CollectionId): Set[Key] = ???
+  override def getKeysForCollection(registerDefinition: CollectibleRegisterDefinition, id: CollectionId): Set[Key] = {
+    val db = getReadableDatabase
+    try {
+      val whereClause = s"${SQLiteStorageManager.collKey}=$id"
+      val cursor = db.query(tableName(registerDefinition), Array(SQLiteStorageManager.idKey), whereClause, null, null, null, null, null)
+
+      if (cursor == null) Set()
+      else try {
+        if (cursor.getCount <= 0 || !cursor.moveToFirst()) Set()
+        else {
+          val set = scala.collection.mutable.Set[Key]()
+          do {
+            set += obtainKey(registerDefinition, id, cursor.getInt(0))
+          } while(cursor.moveToNext())
+          set.toSet
+        }
+      } finally {
+        cursor.close()
+      }
+    } finally {
+      db.close()
+    }
+  }
 }

@@ -25,19 +25,24 @@ class Selector extends BaseActivity with Toolbar.OnMenuItemClickListener with Ad
   lazy val listView = findView(TR.listView)
 
   class Adapter extends BaseAdapter {
-    lazy val items = linkedDb.concepts.values.toList
+    lazy val items = linkedDb.words.values.toList
+
+    // Assumed for now that all words have the first alphabet and language and are the ones to be
+    // displayed
+    // TODO: Remove this assumption
+    lazy val alphabet = linkedDb.alphabets.values.head
+    lazy val language = linkedDb.languages.values.head
 
     override def getItemId(position: Int) = position
     override def getCount = items.size
-    override def getItem(position: Int) = items(position)
+    override def getItem(position: Int) = {
+      items(position).pieces.flatMap(_.get(alphabet)).flatMap(x => x).map(_.unicode.toChar).mkString("")
+    }
 
     override def getView(position: Int, convertView: View, parent: ViewGroup) = {
       val view = if (convertView != null) convertView
       else LayoutInflater.from(parent.getContext).inflate(R.layout.selector_entry, parent, false)
-
-      val item = getItem(position)
-      val textView = view.findViewById(R.id.entryCaption).asInstanceOf[TextView]
-      textView.setText(item.hint)
+      view.findViewById(R.id.entryCaption).asInstanceOf[TextView].setText(getItem(position))
       view
     }
   }
