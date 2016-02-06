@@ -27,6 +27,10 @@
         </activity>
 
         <activity
+            android:name=".activities.WordDetails"
+            android:label="@string/appName"/>
+
+        <activity
             android:name=".activities.WordEditor"
             android:label="@string/appName"/>
     </application>

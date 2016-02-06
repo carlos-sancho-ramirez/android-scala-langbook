@@ -1,5 +1,6 @@
 package sword.langbook.android.activities
 
 object RequestCodes {
-  val newWord = 1
+  val addNewWord = 1
+  val checkWordDetails = 2
 }

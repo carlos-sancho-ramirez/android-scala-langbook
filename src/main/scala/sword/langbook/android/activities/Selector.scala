@@ -36,14 +36,15 @@ class Selector extends BaseActivity with Toolbar.OnMenuItemClickListener with Ad
 
     override def getItemId(position: Int) = position
     override def getCount = items.size
-    override def getItem(position: Int) = {
-      items(position).pieces.flatMap(_.get(alphabet)).flatMap(x => x).map(_.unicode.toChar).mkString("")
-    }
+    override def getItem(position: Int) = items(position)
 
     override def getView(position: Int, convertView: View, parent: ViewGroup) = {
       val view = if (convertView != null) convertView
       else LayoutInflater.from(parent.getContext).inflate(R.layout.selector_entry, parent, false)
-      view.findView(TR.entryCaption).setText(getItem(position))
+
+      val text = items(position).pieces.flatMap(_.get(alphabet)).flatMap(x => x)
+          .map(_.unicode.toChar).mkString("")
+      view.findView(TR.entryCaption).setText(text)
       view
     }
   }
@@ -73,19 +74,20 @@ class Selector extends BaseActivity with Toolbar.OnMenuItemClickListener with Ad
   override def onMenuItemClick(item: MenuItem) = {
     item.getItemId match {
       case R.id.newWordOption =>
-        WordEditor.openWith(this, RequestCodes.newWord)
+        WordEditor.openWith(this, RequestCodes.addNewWord)
         true
       case _ => false
     }
   }
 
   override def onItemClick(parent: AdapterView[_], view: View, position: Int, id: Long): Unit = {
-    // TODO: To be implemented to open the word details
+    val word = parent.getAdapter.asInstanceOf[Adapter].getItem(position)
+    WordDetails.openWith(this, RequestCodes.checkWordDetails, word)
   }
 
   override def onActivityResult(requestCode :Int, resultCode :Int, data :Intent) :Unit = {
     requestCode match {
-      case RequestCodes.newWord => if (resultCode == Activity.RESULT_OK) invalidateAdapter()
+      case RequestCodes.`addNewWord` => if (resultCode == Activity.RESULT_OK) invalidateAdapter()
       case _ => super.onActivityResult(requestCode, resultCode, data)
     }
   }
