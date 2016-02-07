@@ -40,9 +40,9 @@ class WordDetails extends BaseActivity {
       val text = word.pieces.flatMap(_.get(alphabet)).flatMap(x => x)
         .map(_.unicode.toChar).mkString("")
       findView(TR.toolBar).setTitle(text)
-    }
 
-    // TODO: Display the proper language
-    findView(TR.languageText).setText("Language?")
+      // TODO: Display the word attached instead of the concept hint
+      findView(TR.languageText).setText(word.language.concept.hint)
+    }
   }
 }
