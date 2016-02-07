@@ -62,8 +62,23 @@ class SQLiteStorageManager(context :Context, override val registerDefinitions :S
       })
     }
 
-    insert(db, registers.Language(insertConcept("English").get))
-    insert(db, registers.Alphabet(insertConcept("English alphabet").get))
+    val englishKey = insert(db, registers.Language(insertConcept("English").get)).get
+    val alphabetKey = insert(db, registers.Alphabet(insertConcept("English alphabet").get)).get
+
+    // Adding the English language
+    // TODO: Find a way to add languages dynamically and not hardcode them on creating the database
+    val word = "English"
+    val symbols = {
+      for {
+        symbol <- word.toSet[Char]
+        key <- insert(db, registers.Symbol(symbol.toInt))
+      } yield (symbol, key)
+    }.toMap
+
+    val symbolArrayCollection = insert(db, word.toList.map(c => registers.SymbolPosition(symbols(c)))).get
+    val piece = insert(db, List(registers.Piece(alphabetKey, symbolArrayCollection))).get
+    val pieceArray = insert(db, List(registers.PiecePosition(piece))).get
+    insert(db, registers.Word(englishKey, pieceArray))
   }
 
   override def onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int): Unit = {
@@ -184,6 +199,28 @@ class SQLiteStorageManager(context :Context, override val registerDefinitions :S
     }
   }
 
+  private def insert(db: SQLiteDatabase, registers: Traversable[Register]): Option[CollectionId] = {
+    var collId = 1
+    val cursor = db.query(tableName(registers.head.definition), Array(SQLiteStorageManager.collKey),
+        null, null, null, null, null, null)
+
+    if (cursor != null) try {
+      if (cursor.getCount > 0 && cursor.moveToFirst()) {
+        do {
+          val thisCollId = cursor.getInt(0)
+          if (thisCollId >= collId) collId = thisCollId + 1
+        } while(cursor.moveToNext())
+      }
+    } finally {
+      cursor.close()
+    }
+
+    for (register <- registers) {
+      insert(db, collId, register)
+    }
+    Some(collId)
+  }
+
   override def insert(registers: Traversable[Register]): Option[CollectionId] = {
     val definitions = registers.map(_.definition).toSet
     if (definitions.size != 1) {
@@ -196,23 +233,7 @@ class SQLiteStorageManager(context :Context, override val registerDefinitions :S
 
     val db = getWritableDatabase
     try {
-      var collId = 1
-      val cursor = db.query(tableName(definitions.head), Array(SQLiteStorageManager.collKey), null, null, null, null, null, null)
-      if (cursor != null) try {
-        if (cursor.getCount > 0 && cursor.moveToFirst()) {
-          do {
-            val thisCollId = cursor.getInt(0)
-            if (thisCollId >= collId) collId = thisCollId + 1
-          } while(cursor.moveToNext())
-        }
-      } finally {
-        cursor.close()
-      }
-
-      for (register <- registers) {
-        insert(db, collId, register)
-      }
-      Some(collId)
+      insert(db, registers)
     } finally {
       db.close()
     }
