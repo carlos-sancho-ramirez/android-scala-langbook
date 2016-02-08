@@ -67,18 +67,19 @@ class SQLiteStorageManager(context :Context, override val registerDefinitions :S
 
     // Adding the English language
     // TODO: Find a way to add languages dynamically and not hardcode them on creating the database
-    val word = "English"
+    val string = "English"
     val symbols = {
       for {
-        symbol <- word.toSet[Char]
+        symbol <- string.toSet[Char]
         key <- insert(db, registers.Symbol(symbol.toInt))
       } yield (symbol, key)
     }.toMap
 
-    val symbolArrayCollection = insert(db, word.toList.map(c => registers.SymbolPosition(symbols(c)))).get
+    val symbolArrayCollection = insert(db, string.toList.map(c => registers.SymbolPosition(symbols(c)))).get
     val piece = insert(db, List(registers.Piece(alphabetKey, symbolArrayCollection))).get
     val pieceArray = insert(db, List(registers.PiecePosition(piece))).get
-    insert(db, registers.Word(englishKey, pieceArray))
+    val word = insert(db, registers.Word(englishKey, pieceArray)).get
+    insert(db, registers.WordConcept(word, englishKey))
   }
 
   override def onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int): Unit = {
