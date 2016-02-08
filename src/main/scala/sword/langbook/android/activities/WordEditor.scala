@@ -29,17 +29,17 @@ class WordEditor extends BaseActivity with View.OnClickListener {
   }
 
   override def onClick(v: View): Unit = {
-    val word = findView(TR.wordField).getText.toString
+    val text = findView(TR.wordField).getText.toString
 
     // TODO: This has to be changed to include words instead of concepts
-    if (!TextUtils.isEmpty(word)) {
+    if (!TextUtils.isEmpty(text)) {
       import sword.langbook.db.registers
       val manager = linkedDb.storageManager
 
       // First we need to add the each missing symbol
       val originalSymbols = manager.getMapFor(registers.Symbol).values.map(_.fields(0)
           .asInstanceOf[sword.db.UnicodeField].value).toSet
-      val symbolsToAdd = word.toSet[Char].map(_.toInt).diff(originalSymbols)
+      val symbolsToAdd = text.toSet[Char].map(_.toInt).diff(originalSymbols)
       for (symbol <- symbolsToAdd) {
         // Currently if there is an error inserting any of the symbols we will be unable to register
         // the word properly, so none of them should be added in that case to avoid orfan symbols
@@ -51,7 +51,7 @@ class WordEditor extends BaseActivity with View.OnClickListener {
       val currentSymbols = manager.getMapFor(registers.Symbol).map { case (k, v) =>
         (v.fields(0).asInstanceOf[sword.db.UnicodeField].value, k)
       }
-      val symbolArrayCollection = manager.insert(word.map(currentSymbols(_)).map(registers.SymbolPosition(_)))
+      val symbolArrayCollection = manager.insert(text.map(currentSymbols(_)).map(registers.SymbolPosition(_)))
 
       // Right now we are assuming that all words are for the first alphabet in the database
       // TODO: Make this alphabet not hardcoded
@@ -65,8 +65,13 @@ class WordEditor extends BaseActivity with View.OnClickListener {
       // Right now we are assuming that all words are for the first language in the database
       // TODO: Make this alphabet not hardcoded
       val languageKey = manager.getKeysFor(registers.Language).head
-      for (array <- pieceArray) {
-        manager.insert(registers.Word(languageKey, array))
+      val word = pieceArray.flatMap(array => manager.insert(registers.Word(languageKey, array)))
+
+      for {
+        wordKey <- word
+        conceptKey <- manager.insert(registers.Concept(text))
+      } {
+        manager.insert(registers.WordConcept(wordKey, conceptKey))
       }
     }
 
