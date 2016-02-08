@@ -3,8 +3,6 @@ package sword.langbook.android.activities
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
-import android.text.TextUtils
-import android.view.View
 import sword.langbook.android.{TR, R}
 import sword.langbook.db.Word
 
@@ -26,7 +24,6 @@ class WordDetails extends BaseActivity {
   override def onCreate(savedInstanceState :Bundle) :Unit = {
     super.onCreate(savedInstanceState)
     setContentView(R.layout.word_details)
-    //findView(TR.toolBar).setTitle(getIntent.getStringExtra(BundleKeys.wordKey))
 
     val keyOption = linkedDb.storageManager.decode(getIntent.getStringExtra(BundleKeys.wordKey))
     for {
@@ -41,8 +38,14 @@ class WordDetails extends BaseActivity {
         .map(_.unicode.toChar).mkString("")
       findView(TR.toolBar).setTitle(text)
 
-      // TODO: Display the word attached instead of the concept hint
-      findView(TR.languageText).setText(word.language.concept.hint)
+      val language = word.language
+      for {
+        word <- language.concept.wordsForLanguage(language).headOption
+        // TODO: Select the most suitable alphabet
+        text <- word.text(alphabet)
+      } {
+        findView(TR.languageText).setText(text)
+      }
     }
   }
 }
