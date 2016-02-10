@@ -9,4 +9,5 @@
 
     <!-- Menu options -->
     <string name="newWordOption">New word</string>
+    <string name="newSynonymOption">New synonym</string>
 </resources>

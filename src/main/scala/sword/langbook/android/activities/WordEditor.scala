@@ -6,13 +6,18 @@ import android.os.Bundle
 import android.text.TextUtils
 import android.view.View
 import sword.langbook.android.{TR, R}
+import sword.langbook.db.Concept
 
 object WordEditor {
   private val className = "sword.langbook.android.activities.WordEditor"
 
-  def openWith(activity :Activity, requestCode :Int = 0) = {
+  def openWith(activity :Activity, requestCode :Int = 0, concept :Concept = null) = {
     val intent = new Intent()
     intent.setClassName(activity, className)
+
+    if (concept != null) {
+      intent.putExtra(BundleKeys.conceptKey, concept.key.encoded)
+    }
 
     if (requestCode > 0) activity.startActivityForResult(intent, requestCode)
     else activity.startActivity(intent)
@@ -67,9 +72,15 @@ class WordEditor extends BaseActivity with View.OnClickListener {
       val languageKey = manager.getKeysFor(registers.Language).head
       val word = pieceArray.flatMap(array => manager.insert(registers.Word(languageKey, array)))
 
+      val argsConceptKey = manager.decode(getIntent.getStringExtra(BundleKeys.conceptKey))
+      val conceptKeyOpt = {
+        if (argsConceptKey.nonEmpty) argsConceptKey
+        else manager.insert(registers.Concept(text))
+      }
+
       for {
         wordKey <- word
-        conceptKey <- manager.insert(registers.Concept(text))
+        conceptKey <- conceptKeyOpt
       } {
         manager.insert(registers.WordConcept(wordKey, conceptKey))
       }
