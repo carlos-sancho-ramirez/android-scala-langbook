@@ -62,12 +62,14 @@ class SQLiteStorageManager(context :Context, override val registerDefinitions :S
       })
     }
 
-    val englishKey = insert(db, registers.Language(insertConcept("English").get)).get
-    val alphabetKey = insert(db, registers.Alphabet(insertConcept("English alphabet").get)).get
-
     // Adding the English language
     // TODO: Find a way to add languages dynamically and not hardcode them on creating the database
-    val string = "English"
+    val englishEnText = "English"
+    val englishSpText = "Inglés"
+    val spanishEnText = "Spanish"
+    val spanishSpText = "Español"
+
+    val string = englishEnText + englishSpText + spanishEnText + spanishSpText
     val symbols = {
       for {
         symbol <- string.toSet[Char]
@@ -75,11 +77,39 @@ class SQLiteStorageManager(context :Context, override val registerDefinitions :S
       } yield (symbol, key)
     }.toMap
 
-    val symbolArrayCollection = insert(db, string.toList.map(c => registers.SymbolPosition(symbols(c)))).get
-    val piece = insert(db, List(registers.Piece(alphabetKey, symbolArrayCollection))).get
-    val pieceArray = insert(db, List(registers.PiecePosition(piece))).get
-    val word = insert(db, registers.Word(englishKey, pieceArray)).get
-    insert(db, registers.WordConcept(word, englishKey))
+    val englishConceptKey = insertConcept("English").get
+    val spanishConceptKey = insertConcept("Spanish").get
+
+    val englishKey = insert(db, registers.Language(englishConceptKey)).get
+    val enAlphabetKey = insert(db, registers.Alphabet(insertConcept("English alphabet").get)).get
+
+    val spanishKey = insert(db, registers.Language(spanishConceptKey)).get
+    val spAlphabetKey = insert(db, registers.Alphabet(insertConcept("Spanish alphabet").get)).get
+
+    val englishEnSymbolArrayCollection = insert(db, englishEnText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
+    val englishSpSymbolArrayCollection = insert(db, englishSpText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
+    val spanishEnSymbolArrayCollection = insert(db, spanishEnText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
+    val spanishSpSymbolArrayCollection = insert(db, spanishSpText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
+
+    val englishEnPiece = insert(db, List(registers.Piece(enAlphabetKey, englishEnSymbolArrayCollection))).get
+    val englishSpPiece = insert(db, List(registers.Piece(spAlphabetKey, englishSpSymbolArrayCollection))).get
+    val spanishEnPiece = insert(db, List(registers.Piece(enAlphabetKey, spanishEnSymbolArrayCollection))).get
+    val spanishSpPiece = insert(db, List(registers.Piece(spAlphabetKey, spanishSpSymbolArrayCollection))).get
+
+    val englishEnPieceArray = insert(db, List(registers.PiecePosition(englishEnPiece))).get
+    val englishSpPieceArray = insert(db, List(registers.PiecePosition(englishSpPiece))).get
+    val spanishEnPieceArray = insert(db, List(registers.PiecePosition(spanishEnPiece))).get
+    val spanishSpPieceArray = insert(db, List(registers.PiecePosition(spanishSpPiece))).get
+
+    val englishEnWord = insert(db, registers.Word(englishKey, englishEnPieceArray)).get
+    val englishSpWord = insert(db, registers.Word(spanishKey, englishSpPieceArray)).get
+    val spanishEnWord = insert(db, registers.Word(englishKey, spanishEnPieceArray)).get
+    val spanishSpWord = insert(db, registers.Word(spanishKey, spanishSpPieceArray)).get
+
+    insert(db, registers.WordConcept(englishEnWord, englishConceptKey))
+    insert(db, registers.WordConcept(englishSpWord, englishConceptKey))
+    insert(db, registers.WordConcept(spanishEnWord, spanishConceptKey))
+    insert(db, registers.WordConcept(spanishSpWord, spanishConceptKey))
   }
 
   override def onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int): Unit = {
