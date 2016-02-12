@@ -46,7 +46,7 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
       // displayed
       // TODO: Remove this assumption
       val alphabet = linkedDb.alphabets.values.head
-      val text = word.pieces.flatMap(_.get(alphabet)).flatMap(x => x)
+      val text = word.pieces.flatMap(_.values.headOption).flatMap(x => x)
         .map(_.unicode.toChar).mkString("")
       toolBar.setTitle(text)
 
