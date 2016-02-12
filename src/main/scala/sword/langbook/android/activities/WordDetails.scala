@@ -45,7 +45,6 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
       // Assumed for now that all words have the first alphabet and language and are the ones to be
       // displayed
       // TODO: Remove this assumption
-      val alphabet = linkedDb.alphabets.values.head
       val text = word.pieces.flatMap(_.values.headOption).flatMap(x => x)
         .map(_.unicode.toChar).mkString("")
       toolBar.setTitle(text)
@@ -53,13 +52,13 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
       val language = word.language
       for {
         word <- language.concept.wordsForLanguage(language).headOption
-        // TODO: Select the most suitable alphabet
-        text <- word.text(alphabet)
+        // TODO: Select the most suitable alphabet instead of the first one
+        text <- word.text.values.headOption
       } {
         findView(TR.languageText).setText(text)
       }
 
-      findView(TR.synonymsText).setText(word.synonyms.flatMap(_.text(alphabet)).mkString(", "))
+      findView(TR.synonymsText).setText(word.synonyms.flatMap(_.text.values.headOption).mkString(", "))
     }
   }
 
