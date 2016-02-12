@@ -55,10 +55,21 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
         // TODO: Select the most suitable alphabet instead of the first one
         text <- word.text.values.headOption
       } {
-        findView(TR.languageText).setText(text)
+        // TODO: Improve this UI and avoid hardcode strings
+        findView(TR.languageText).setText(s"Language: $text")
       }
 
-      findView(TR.synonymsText).setText(word.synonyms.flatMap(_.text.values.headOption).mkString(", "))
+      val synonyms = word.synonyms.flatMap(_.text.values.headOption).mkString(", ")
+      if (synonyms.nonEmpty) {
+        // TODO: Improve this UI and avoid hardcode strings
+        findView(TR.synonymsText).setText(s"Synonyms: $synonyms")
+      }
+
+      val translations = word.translations.flatMap(_.text.values.headOption).mkString(", ")
+      if (translations.nonEmpty) {
+        // TODO: Improve this UI and avoid hardcode strings
+        findView(TR.synonymsText).setText(s"Translations: $translations")
+      }
     }
   }
 
