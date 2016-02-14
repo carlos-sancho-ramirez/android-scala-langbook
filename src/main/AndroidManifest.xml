@@ -17,6 +17,10 @@
         android:fullBackupContent="true">
 
         <activity
+            android:name=".activities.LanguageSelector"
+            android:label="@string/appName"/>
+
+        <activity
             android:name=".activities.Selector"
             android:label="@string/appName">
 
