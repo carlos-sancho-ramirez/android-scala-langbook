@@ -39,8 +39,7 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
     updateMenu(toolBar.getMenu)
 
     for {
-      key <- wordKeyOption
-      word <- linkedDb.words.get(key)
+      word <- wordOption
     } {
       // Assumed for now that all words have the first alphabet and language and are the ones to be
       // displayed
@@ -79,25 +78,33 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
   }
 
   override def onMenuItemClick(item: MenuItem) = {
-    println("onMenuItemClick called")
-    item.getItemId match {
-      case R.id.newSynonymOption =>
-        println("  with newSynonymOption")
-        for (word <- wordOption) {
-          val concepts = word.concepts
+    val result = {
+      for (word <- wordOption) yield {
+        val concepts = word.concepts
 
-          // Currently the user only can create a synonym for a word with only one concept linked.
-          // This limitation should be removed whenever there is a suitable option available to
-          // distinguish among concepts in a human readable way.
-          // TODO: Change this when possible to allow the user selecting to which concept should be linked
-          println(s"  with concepts.size ${concepts.size}")
-          if (concepts.size == 1) {
-            WordEditor.openWith(this, RequestCodes.addNewWord, concept = concepts.head)
+        // Currently the user only can create a synonym or translation for a word with only one concept linked.
+        // This limitation should be removed whenever there is a suitable option available to
+        // distinguish among concepts in a human readable way.
+        // TODO: Change this when possible to allow the user selecting to which concept should be linked
+        if (concepts.size == 1) {
+          item.getItemId match {
+            case R.id.newSynonymOption =>
+              WordEditor.openWith(this, RequestCodes.addNewWord, concept = concepts.head, language = word.language)
+              true
+
+            case R.id.newTranslationOption =>
+              WordEditor.openWith(this, RequestCodes.addNewWord, concept = concepts.head, excludedLanguage = word.language)
+              true
+
+            case _ =>
+              false
           }
         }
-        true
-      case _ => false
+        else false
+      }
     }
+
+    result.isDefined && result.get
   }
 
   override def onActivityResult(requestCode :Int, resultCode :Int, data :Intent) :Unit = {

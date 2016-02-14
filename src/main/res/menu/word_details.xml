@@ -8,4 +8,10 @@
         android:orderInCategory="1"
         app:showAsAction="never"
         android:title="@string/newSynonymOption"/>
+
+    <item
+        android:id="@+id/newTranslationOption"
+        android:orderInCategory="1"
+        app:showAsAction="never"
+        android:title="@string/newTranslationOption"/>
 </menu>

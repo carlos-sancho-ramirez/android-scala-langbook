@@ -12,9 +12,13 @@ import sword.langbook.android.TypedResource._
 object LanguageSelector {
   private val className = "sword.langbook.android.activities.LanguageSelector"
 
-  def openWith(activity :Activity, requestCode :Int = 0) = {
+  def openWith(activity: Activity, requestCode: Int = 0, excludedLanguageEncodedKey: String = null) = {
     val intent = new Intent()
     intent.setClassName(activity, className)
+
+    if (excludedLanguageEncodedKey != null) {
+      intent.putExtra(BundleKeys.excludedLanguageKey, excludedLanguageEncodedKey)
+    }
 
     if (requestCode > 0) activity.startActivityForResult(intent, requestCode)
     else activity.startActivity(intent)
@@ -26,7 +30,8 @@ class LanguageSelector extends BaseActivity with Toolbar.OnMenuItemClickListener
   lazy val listView = findView(TR.listView)
 
   class Adapter extends BaseAdapter {
-    lazy val items = linkedDb.languages.values.toList
+    lazy val items = linkedDb.languages.values.toList.filter(_.key.encoded !=
+      getIntent.getStringExtra(BundleKeys.excludedLanguageKey))
 
     override def getItemId(position: Int) = position
     override def getCount = items.size

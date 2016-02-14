@@ -12,7 +12,8 @@ import sword.langbook.db.{LinkedStorageManager, Language, Concept}
 object WordEditor {
   private val className = "sword.langbook.android.activities.WordEditor"
 
-  def openWith(activity: Activity, requestCode: Int = 0, concept: Concept = null, language: Language = null) = {
+  def openWith(activity: Activity, requestCode: Int = 0, concept: Concept = null,
+               language: Language = null, excludedLanguage: Language = null) = {
     val intent = new Intent()
     intent.setClassName(activity, className)
 
@@ -22,6 +23,10 @@ object WordEditor {
 
     if (language != null) {
       intent.putExtra(BundleKeys.languageKey, language.key.encoded)
+    }
+
+    if (excludedLanguage != null) {
+      intent.putExtra(BundleKeys.excludedLanguageKey, excludedLanguage.key.encoded)
     }
 
     if (requestCode > 0) activity.startActivityForResult(intent, requestCode)
@@ -68,7 +73,8 @@ class WordEditor extends BaseActivity with View.OnClickListener {
     super.onResume()
 
     if (languageKeyOpt.isEmpty) {
-      LanguageSelector.openWith(this, RequestCodes.pickLanguage)
+      LanguageSelector.openWith(this, requestCode = RequestCodes.pickLanguage,
+        excludedLanguageEncodedKey = getIntent.getStringExtra(BundleKeys.excludedLanguageKey))
     }
   }
 

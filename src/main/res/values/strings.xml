@@ -11,5 +11,6 @@
     <!-- Menu options -->
     <string name="newLanguageOption">New language</string>
     <string name="newSynonymOption">New synonym</string>
+    <string name="newTranslationOption">New translation</string>
     <string name="newWordOption">New word</string>
 </resources>
