@@ -48,6 +48,13 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
         .map(_.unicode.toChar).mkString("")
       toolBar.setTitle(text)
 
+      val alphabetStr = word.text.flatMap {
+        case (alphabet, thisText) =>
+          val alphabetText = alphabet.concept.words.headOption.flatMap(_.text.values.headOption)
+          alphabetText.map(alphabetText => s"$alphabetText: $thisText")
+      }.mkString("\n")
+      findView(TR.alphabetText).setText(alphabetStr)
+
       val language = word.language
       for {
         word <- language.concept.wordsForLanguage(language).headOption
