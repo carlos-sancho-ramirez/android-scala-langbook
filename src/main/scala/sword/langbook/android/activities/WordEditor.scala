@@ -5,9 +5,9 @@ import android.content.Intent
 import android.os.Bundle
 import android.text.TextUtils
 import android.view.View
-import sword.db.StorageManager
 import sword.langbook.android.{TR, R}
-import sword.langbook.db.{LinkedStorageManager, Language, Concept}
+import sword.langbook.android.TypedResource._
+import sword.langbook.db.{Language, Concept}
 
 object WordEditor {
   private val className = "sword.langbook.android.activities.WordEditor"
@@ -52,6 +52,7 @@ class WordEditor extends BaseActivity with View.OnClickListener {
 
     if (savedInstanceState != null) {
       _languageEncodedKey = savedInstanceState.getString(BundleKeys.languageKey)
+      updateUi()
     }
   }
 
@@ -60,12 +61,30 @@ class WordEditor extends BaseActivity with View.OnClickListener {
       case RequestCodes.`pickLanguage` => {
         if (resultCode == Activity.RESULT_OK) {
           _languageEncodedKey = data.getStringExtra(BundleKeys.languageKey)
+          updateUi()
         }
         else {
           finish()
         }
       }
       case _ => super.onActivityResult(requestCode, resultCode, data)
+    }
+  }
+
+  private def updateUi(): Unit = {
+    val container = findView(TR.entryContainer)
+    container.removeAllViews()
+    val inflater = getLayoutInflater
+
+    for {
+      languageKey <- languageKeyOpt
+      alphabet <- Language(languageKey).alphabets
+      // TODO: This must be changed to pick the proper alphabet
+      alphabetWord <- alphabet.concept.words.headOption
+      alphabetText <- alphabetWord.text.values.headOption
+    } {
+      val entry = inflater.inflate(TR.layout.word_editor_entry, container, true)
+      entry.findView(TR.fieldTitle).setText(alphabetText)
     }
   }
 
@@ -78,6 +97,7 @@ class WordEditor extends BaseActivity with View.OnClickListener {
     }
   }
 
+  // TODO: This should save all the alphabets entered, and not just the first one
   override def onClick(v: View): Unit = {
     val text = findView(TR.wordField).getText.toString
 

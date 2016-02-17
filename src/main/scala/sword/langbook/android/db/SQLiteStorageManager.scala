@@ -206,6 +206,12 @@ class SQLiteStorageManager(context :Context, override val registerDefinitions :S
     insert(db, registers.WordConcept(spAlphabetSpWord, spAlphabetConceptKey))
     insert(db, registers.WordConcept(kanjiJpWord, kanjiAlphabetConceptKey))
     insert(db, registers.WordConcept(kanaJpWord, kanaAlphabetConceptKey))
+
+    // TODO: LanguageAlphabet is a redundant structure and this should be removed when not required
+    insert(db, registers.LanguageAlphabet(englishKey, enAlphabetKey))
+    insert(db, registers.LanguageAlphabet(spanishKey, spAlphabetKey))
+    insert(db, registers.LanguageAlphabet(japaneseKey, kanjiAlphabetKey))
+    insert(db, registers.LanguageAlphabet(japaneseKey, kanaAlphabetKey))
   }
 
   override def onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int): Unit = {

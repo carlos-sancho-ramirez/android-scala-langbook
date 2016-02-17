@@ -4,16 +4,16 @@
     android:layout_height="match_parent"
     android:orientation="vertical">
 
-    <LinearLayout
-        android:id="@+id/entryContainer"
+    <TextView
+        android:id="@+id/fieldTitle"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"/>
+        android:layout_height="wrap_content" />
 
-    <Button
-        android:id="@+id/saveButton"
+    <EditText
+        android:id="@+id/wordField"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/wordEditorSaveButton"/>
+        android:inputType="text"
+        android:hint="@string/wordEditorFieldHint"/>
 
 </LinearLayout>
