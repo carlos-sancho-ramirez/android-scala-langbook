@@ -13,4 +13,7 @@
     <string name="newSynonymOption">New synonym</string>
     <string name="newTranslationOption">New translation</string>
     <string name="newWordOption">New word</string>
+
+    <!-- Warning messages -->
+    <string name="oneFieldRequired">Please fill at least one of the fields first</string>
 </resources>

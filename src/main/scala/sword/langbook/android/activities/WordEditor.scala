@@ -4,10 +4,11 @@ import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.text.TextUtils
-import android.view.View
+import android.view.{ViewGroup, View}
+import android.widget.Toast
 import sword.langbook.android.{TR, R}
 import sword.langbook.android.TypedResource._
-import sword.langbook.db.{Language, Concept}
+import sword.langbook.db.{registers, Alphabet, Language, Concept}
 
 object WordEditor {
   private val className = "sword.langbook.android.activities.WordEditor"
@@ -84,6 +85,7 @@ class WordEditor extends BaseActivity with View.OnClickListener {
       alphabetText <- alphabetWord.text.values.headOption
     } {
       val entry = inflater.inflate(TR.layout.word_editor_entry, container, true)
+      entry.setTag(alphabet)
       entry.findView(TR.fieldTitle).setText(alphabetText)
     }
   }
@@ -97,39 +99,54 @@ class WordEditor extends BaseActivity with View.OnClickListener {
     }
   }
 
-  // TODO: This should save all the alphabets entered, and not just the first one
+  private def viewGroup2ViewIterable(v :ViewGroup) = new Iterable[View] {
+    override def iterator = new Iterator[View] {
+      private var index = 0
+      override def hasNext: Boolean = index < v.getChildCount
+      override def next(): View = {
+        val view = v.getChildAt(index)
+        index += 1
+        view
+      }
+    }
+  }
+
   override def onClick(v: View): Unit = {
-    val text = findView(TR.wordField).getText.toString
+    val manager = linkedDb.storageManager
 
-    // TODO: This has to be changed to include words instead of concepts
-    for {
-      languageKey <- languageKeyOpt
-    } {
-      if (!TextUtils.isEmpty(text)) {
+    val pieceOptionsSet = for {
+      entry <- viewGroup2ViewIterable(findView(TR.entryContainer))
+      alphabet <- Option(entry.getTag.asInstanceOf[Alphabet])
+      text <- Option(entry.findView(TR.wordField).getText.toString) if !TextUtils.isEmpty(text)
+    } yield {
+
+      // First we need to add the each missing symbol
+      val originalSymbols = manager.getMapFor(registers.Symbol).values.map(_.fields(0)
+        .asInstanceOf[sword.db.UnicodeField].value).toSet
+      val symbolsToAdd = text.toSet[Char].map(_.toInt).diff(originalSymbols)
+      for (symbol <- symbolsToAdd) {
+        // Currently if there is an error inserting any of the symbols we will be unable to register
+        // the word properly, so none of them should be added in that case to avoid orfan symbols
+        // TODO: Find a strategy to include all only if the word can be added or nothing at all if not
+        manager.insert(registers.Symbol(symbol))
+      }
+
+      // We collect back all symbol keys and create the array of symbols
+      val currentSymbols = manager.getMapFor(registers.Symbol).map { case (k, v) =>
+        (v.fields(0).asInstanceOf[sword.db.UnicodeField].value, k)
+      }
+      val symbolArrayCollection = manager.insert(text.map(currentSymbols(_)).map(registers.SymbolPosition(_)))
+      symbolArrayCollection.map(array => registers.Piece(alphabet.key, array))
+    }
+
+    val pieceSet = pieceOptionsSet.flatMap(x => x)
+    if (pieceSet.nonEmpty) {
+      for {
+        languageKey <- languageKeyOpt
+      } {
         import sword.langbook.db.registers
-        val manager = linkedDb.storageManager
 
-        // First we need to add the each missing symbol
-        val originalSymbols = manager.getMapFor(registers.Symbol).values.map(_.fields(0)
-          .asInstanceOf[sword.db.UnicodeField].value).toSet
-        val symbolsToAdd = text.toSet[Char].map(_.toInt).diff(originalSymbols)
-        for (symbol <- symbolsToAdd) {
-          // Currently if there is an error inserting any of the symbols we will be unable to register
-          // the word properly, so none of them should be added in that case to avoid orfan symbols
-          // TODO: Find a strategy to include all only if the word can be added or nothing at all if not
-          manager.insert(registers.Symbol(symbol))
-        }
-
-        // We collect back all symbol keys and create the array of symbols
-        val currentSymbols = manager.getMapFor(registers.Symbol).map { case (k, v) =>
-          (v.fields(0).asInstanceOf[sword.db.UnicodeField].value, k)
-        }
-        val symbolArrayCollection = manager.insert(text.map(currentSymbols(_)).map(registers.SymbolPosition(_)))
-
-        // Right now we are assuming that all words are for the first alphabet in the database
-        // TODO: Make this alphabet not hardcoded
-        val alphabetKey = manager.getKeysFor(registers.Alphabet).head
-        val piece = symbolArrayCollection.flatMap(array => manager.insert(List(registers.Piece(alphabetKey, array))))
+        val piece = manager.insert(pieceSet)
 
         // Right now we are assuming that there is only one piece per word
         // TODO: Make possible to add more than one piece for word
@@ -140,7 +157,7 @@ class WordEditor extends BaseActivity with View.OnClickListener {
         val argsConceptKey = manager.decode(getIntent.getStringExtra(BundleKeys.conceptKey))
         val conceptKeyOpt = {
           if (argsConceptKey.nonEmpty) argsConceptKey
-          else manager.insert(registers.Concept(text))
+          else manager.insert(registers.Concept(findView(TR.wordField).getText.toString))
         }
 
         for {
@@ -150,10 +167,13 @@ class WordEditor extends BaseActivity with View.OnClickListener {
           manager.insert(registers.WordConcept(wordKey, conceptKey))
         }
       }
-    }
 
-    setResult(Activity.RESULT_OK)
-    finish()
+      setResult(Activity.RESULT_OK)
+      finish()
+    }
+    else {
+      Toast.makeText(this, R.string.oneFieldRequired, Toast.LENGTH_SHORT).show()
+    }
   }
 
   override def onSaveInstanceState(bundle: Bundle): Unit = {
