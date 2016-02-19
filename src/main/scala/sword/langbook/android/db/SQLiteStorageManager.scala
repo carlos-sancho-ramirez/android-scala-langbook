@@ -188,8 +188,8 @@ class SQLiteStorageManager(context :Context, override val registerDefinitions :S
     val japaneseEnWord = insert(db, registers.Word(englishKey, japaneseEnPieceArray)).get
     val japaneseSpWord = insert(db, registers.Word(spanishKey, japaneseSpPieceArray)).get
     val japaneseJpWord = insert(db, registers.Word(japaneseKey, japaneseJpPieceArray)).get
-    val enAlphabetEnWord = insert(db, registers.Word(japaneseKey, enAlphabetEnPieceArray)).get
-    val spAlphabetSpWord = insert(db, registers.Word(japaneseKey, spAlphabetSpPieceArray)).get
+    val enAlphabetEnWord = insert(db, registers.Word(englishKey, enAlphabetEnPieceArray)).get
+    val spAlphabetSpWord = insert(db, registers.Word(spanishKey, spAlphabetSpPieceArray)).get
     val kanjiJpWord = insert(db, registers.Word(japaneseKey, kanjiJpPieceArray)).get
     val kanaJpWord = insert(db, registers.Word(japaneseKey, kanaJpPieceArray)).get
 
@@ -206,12 +206,6 @@ class SQLiteStorageManager(context :Context, override val registerDefinitions :S
     insert(db, registers.WordConcept(spAlphabetSpWord, spAlphabetConceptKey))
     insert(db, registers.WordConcept(kanjiJpWord, kanjiAlphabetConceptKey))
     insert(db, registers.WordConcept(kanaJpWord, kanaAlphabetConceptKey))
-
-    // TODO: LanguageAlphabet is a redundant structure and this should be removed when not required
-    insert(db, registers.LanguageAlphabet(englishKey, enAlphabetKey))
-    insert(db, registers.LanguageAlphabet(spanishKey, spAlphabetKey))
-    insert(db, registers.LanguageAlphabet(japaneseKey, kanjiAlphabetKey))
-    insert(db, registers.LanguageAlphabet(japaneseKey, kanaAlphabetKey))
   }
 
   override def onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int): Unit = {
