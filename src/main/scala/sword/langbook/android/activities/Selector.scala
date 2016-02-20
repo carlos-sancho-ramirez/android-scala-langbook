@@ -22,7 +22,7 @@ object Selector {
   }
 }
 
-class Selector extends BaseActivity with Toolbar.OnMenuItemClickListener with AdapterView.OnItemClickListener {
+class Selector extends BaseActivity with AdapterView.OnItemClickListener {
 
   lazy val listView = findView(TR.listView)
 
@@ -47,11 +47,6 @@ class Selector extends BaseActivity with Toolbar.OnMenuItemClickListener with Ad
     }
   }
 
-  def updateMenu(menu :Menu) = {
-    menu.clear()
-    getMenuInflater.inflate(R.menu.selector, menu)
-  }
-
   def invalidateAdapter() :Unit = {
     listView.setAdapter(new Adapter)
   }
@@ -67,8 +62,7 @@ class Selector extends BaseActivity with Toolbar.OnMenuItemClickListener with Ad
       private val selected = scala.collection.mutable.BitSet()
 
       override def onItemCheckedStateChanged(mode: ActionMode, position: Int, id: Long, checked: Boolean): Unit = {
-        val value = if (checked) "checked" else "unchecked"
-        Toast.makeText(Selector.this, s"Position $position is $value", Toast.LENGTH_SHORT).show()
+        // Nothing to be done here
       }
 
       override def onDestroyActionMode(mode: ActionMode): Unit = {
@@ -96,11 +90,15 @@ class Selector extends BaseActivity with Toolbar.OnMenuItemClickListener with Ad
 
     val toolBar = findView(TR.toolBar)
     toolBar.setTitle(R.string.appName)
-    toolBar.setOnMenuItemClickListener(this)
-    updateMenu(toolBar.getMenu)
+    setSupportActionBar(toolBar)
   }
 
-  override def onMenuItemClick(item: MenuItem) = {
+  override def onCreateOptionsMenu(menu: Menu) = {
+    getMenuInflater.inflate(R.menu.selector, menu)
+    true
+  }
+
+  override def onOptionsItemSelected(item: MenuItem) = {
     item.getItemId match {
       case R.id.newWordOption =>
         WordEditor.openWith(this, RequestCodes.addNewWord)
