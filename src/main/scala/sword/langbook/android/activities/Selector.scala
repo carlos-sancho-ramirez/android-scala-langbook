@@ -5,7 +5,8 @@ import android.content.Intent
 import android.os.Bundle
 import android.support.v7.widget.Toolbar
 import android.view._
-import android.widget.{BaseAdapter, AdapterView}
+import android.widget.AbsListView.MultiChoiceModeListener
+import android.widget.{Toast, AbsListView, BaseAdapter, AdapterView}
 import sword.langbook.android.{TR, R}
 import sword.langbook.android.TypedResource._
 
@@ -60,6 +61,37 @@ class Selector extends BaseActivity with Toolbar.OnMenuItemClickListener with Ad
     setContentView(R.layout.selector)
 
     listView.setOnItemClickListener(this)
+    listView.setChoiceMode(AbsListView.CHOICE_MODE_MULTIPLE_MODAL)
+    listView.setMultiChoiceModeListener( new MultiChoiceModeListener {
+
+      private val selected = scala.collection.mutable.BitSet()
+
+      override def onItemCheckedStateChanged(mode: ActionMode, position: Int, id: Long, checked: Boolean): Unit = {
+        val value = if (checked) "checked" else "unchecked"
+        Toast.makeText(Selector.this, s"Position $position is $value", Toast.LENGTH_SHORT).show()
+      }
+
+      override def onDestroyActionMode(mode: ActionMode): Unit = {
+        selected.clear()
+      }
+
+      override def onCreateActionMode(mode: ActionMode, menu: Menu): Boolean = {
+        selected.clear()
+        mode.getMenuInflater.inflate(R.menu.selector_multichoice_mode, menu)
+        true
+      }
+
+      override def onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean = {
+        Toast.makeText(Selector.this, "Delete action not implemented yet", Toast.LENGTH_SHORT).show()
+        true
+      }
+
+      override def onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean = {
+        // Nothing to be done
+        false
+      }
+    })
+
     invalidateAdapter()
 
     val toolBar = findView(TR.toolBar)
