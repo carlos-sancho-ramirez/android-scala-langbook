@@ -3,12 +3,14 @@ package sword.langbook.android.activities
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
-import android.support.v7.widget.Toolbar
 import android.view._
-import android.widget.AbsListView.MultiChoiceModeListener
-import android.widget.{Toast, AbsListView, BaseAdapter, AdapterView}
+import android.widget.{AbsListView, BaseAdapter, AdapterView}
+import sword.db.ForeignKeyField
 import sword.langbook.android.{TR, R}
 import sword.langbook.android.TypedResource._
+import sword.langbook.db.registers
+
+import scala.collection.Set
 
 object Selector {
   private val className = "sword.langbook.android.activities.Selector"
@@ -22,7 +24,7 @@ object Selector {
   }
 }
 
-class Selector extends BaseActivity with AdapterView.OnItemClickListener {
+class Selector extends BaseActivity with AdapterView.OnItemClickListener with SelectorChoiceModeCallback {
 
   lazy val listView = findView(TR.listView)
 
@@ -57,42 +59,7 @@ class Selector extends BaseActivity with AdapterView.OnItemClickListener {
 
     listView.setOnItemClickListener(this)
     listView.setChoiceMode(AbsListView.CHOICE_MODE_MULTIPLE_MODAL)
-    listView.setMultiChoiceModeListener( new MultiChoiceModeListener {
-
-      private val selected = scala.collection.mutable.BitSet()
-
-      override def onItemCheckedStateChanged(mode: ActionMode, position: Int, id: Long, checked: Boolean): Unit = {
-        if (checked) {
-          selected.add(position)
-        }
-        else {
-          selected.remove(position)
-        }
-
-        // TODO: Move this hardcoded string to the XML resources handling placeholders and plurals
-        mode.setTitle(s"${selected.size} word(s) selected")
-      }
-
-      override def onDestroyActionMode(mode: ActionMode): Unit = {
-        selected.clear()
-      }
-
-      override def onCreateActionMode(mode: ActionMode, menu: Menu): Boolean = {
-        selected.clear()
-        mode.getMenuInflater.inflate(R.menu.selector_multichoice_mode, menu)
-        true
-      }
-
-      override def onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean = {
-        Toast.makeText(Selector.this, "Delete action not implemented yet", Toast.LENGTH_SHORT).show()
-        true
-      }
-
-      override def onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean = {
-        // Nothing to be done
-        false
-      }
-    })
+    listView.setMultiChoiceModeListener(SelectorChoiceModeListener(this))
 
     invalidateAdapter()
 
@@ -124,6 +91,32 @@ class Selector extends BaseActivity with AdapterView.OnItemClickListener {
     requestCode match {
       case RequestCodes.`addNewWord` => if (resultCode == Activity.RESULT_OK) invalidateAdapter()
       case _ => super.onActivityResult(requestCode, resultCode, data)
+    }
+  }
+
+  override def delete(positions: Set[Int]): Unit = {
+    val adapter = listView.getAdapter.asInstanceOf[Adapter]
+    val linked = linkedDb
+    val manager = linked.storageManager
+    for {
+      position <- positions
+    } {
+      val wordKey = adapter.getItem(position).key
+
+      // Delete the WordConcept relation
+      manager.getMapFor(registers.WordConcept).filter(_._2.fields.collectFirst {
+        case field: ForeignKeyField if field.definition.target == registers.Word && field.key == wordKey =>
+          true
+      }.isDefined).keys.foreach(manager.delete)
+
+      // Delete the word
+      if (!manager.delete(wordKey)) {
+        throw new AssertionError("Unable to remove word")
+      }
+    }
+
+    if (positions.nonEmpty) {
+      invalidateAdapter()
     }
   }
 }
