@@ -397,7 +397,24 @@ class SQLiteStorageManager(context :Context, override val registerDefinitions :S
   }
 
   override def replace(register: Register, key: Key): Boolean = ???
-  override def delete(key: Key): Boolean = ???
+
+  // TODO: This should check if it is referenced before removing
+  private def delete(db: SQLiteDatabase, key: Key): Boolean = {
+    val query = s"DELETE FROM ${tableName(key.registerDefinition)} WHERE ${SQLiteStorageManager.idKey}=${key.index}"
+    logi(s"Executing query: $query")
+    db.execSQL(query)
+    true
+  }
+
+  override def delete(key: Key): Boolean = {
+    val db = getWritableDatabase
+    try {
+      delete(db, key)
+    } finally {
+      db.close()
+    }
+  }
+
   override def getKeysForCollection(registerDefinition: CollectibleRegisterDefinition, id: CollectionId): Set[Key] = {
     val db = getReadableDatabase
     try {
