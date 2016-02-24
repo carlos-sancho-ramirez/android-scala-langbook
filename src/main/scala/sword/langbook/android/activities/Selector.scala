@@ -62,7 +62,15 @@ class Selector extends BaseActivity with AdapterView.OnItemClickListener {
       private val selected = scala.collection.mutable.BitSet()
 
       override def onItemCheckedStateChanged(mode: ActionMode, position: Int, id: Long, checked: Boolean): Unit = {
-        // Nothing to be done here
+        if (checked) {
+          selected.add(position)
+        }
+        else {
+          selected.remove(position)
+        }
+
+        // TODO: Move this hardcoded string to the XML resources handling placeholders and plurals
+        mode.setTitle(s"${selected.size} word(s) selected")
       }
 
       override def onDestroyActionMode(mode: ActionMode): Unit = {
