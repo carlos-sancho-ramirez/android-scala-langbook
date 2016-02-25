@@ -15,8 +15,8 @@ object SQLiteStorageManager {
   val collKey = "coll"
 }
 
-class SQLiteStorageManager(context :Context, override val registerDefinitions :Seq[RegisterDefinition])
-    extends SQLiteOpenHelper(context, SQLiteStorageManager.dbName, null, SQLiteStorageManager.currentDbVersion)
+class SQLiteStorageManager(context :Context, dbName: String, override val registerDefinitions :Seq[RegisterDefinition])
+    extends SQLiteOpenHelper(context, dbName, null, SQLiteStorageManager.currentDbVersion)
     with StorageManager {
 
   private def logi(message :String) = android.util.Log.i("DB", message)
@@ -49,9 +49,7 @@ class SQLiteStorageManager(context :Context, override val registerDefinitions :S
     }
   }
 
-  override def onCreate(db: SQLiteDatabase): Unit = {
-    createTables(db)
-
+  def initializeDatabase(db: SQLiteDatabase): Unit = {
     // As a temporal solution, we add some data to the data base
     import sword.langbook.db.registers
 
@@ -206,6 +204,11 @@ class SQLiteStorageManager(context :Context, override val registerDefinitions :S
     insert(db, registers.WordConcept(spAlphabetSpWord, spAlphabetConceptKey))
     insert(db, registers.WordConcept(kanjiJpWord, kanjiAlphabetConceptKey))
     insert(db, registers.WordConcept(kanaJpWord, kanaAlphabetConceptKey))
+  }
+
+  override def onCreate(db: SQLiteDatabase): Unit = {
+    createTables(db)
+    initializeDatabase(db)
   }
 
   override def onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int): Unit = {
