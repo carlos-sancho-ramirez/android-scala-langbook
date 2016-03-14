@@ -19,6 +19,37 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     extends SQLiteOpenHelper(context, dbName, null, SQLiteStorageManager.currentDbVersion)
     with StorageManager {
 
+  // The following code is copied from AbstractStorageManager, and it should be centralised
+  // TODO: Centralise this code
+  if (registerDefinitions.toSet.size < registerDefinitions.size) {
+    throw new IllegalArgumentException("Duplicated register definitions are not allowed")
+  }
+
+  val singleReferences :Seq[(RegisterDefinition, RegisterDefinition)] = for {
+    regDef <- registerDefinitions
+    fieldDef <- regDef.fields if fieldDef.isInstanceOf[ForeignKeyFieldDefinition]
+  } yield {
+      (regDef, fieldDef.asInstanceOf[ForeignKeyFieldDefinition].target)
+    }
+
+  if (singleReferences.exists { case (_,target) => !registerDefinitions.contains(target) }) {
+    throw new IllegalArgumentException("All given register definitions that include a foreign key" +
+      " field must have as target one of the definitions given")
+  }
+
+  val groupReferences :Seq[(RegisterDefinition, CollectibleRegisterDefinition)] = for {
+    regDef <- registerDefinitions
+    fieldDef <- regDef.fields if fieldDef.isInstanceOf[CollectionReferenceFieldDefinition]
+  } yield {
+      (regDef, fieldDef.asInstanceOf[CollectionReferenceFieldDefinition].target)
+    }
+
+  if (groupReferences.exists { case (_,target) => !registerDefinitions.contains(target) }) {
+    throw new IllegalArgumentException("All given register definitions that include a collection" +
+      " reference field must have as target one of the definitions given")
+  }
+  // End of duplicated code...
+
   private def logi(message :String) = android.util.Log.i("DB", message)
 
   private def tableName(regDef :RegisterDefinition) :String = s"R${registerDefinitions.indexOf(regDef)}"

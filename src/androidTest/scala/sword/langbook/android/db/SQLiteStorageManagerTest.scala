@@ -30,6 +30,22 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
     override val definition = numRegDef
   }
 
+  val numRegForeignKeyFieldDef = new ForeignKeyFieldDefinition {
+    override val target = numRegDef
+  }
+
+  val numRegRefRegDef = new RegisterDefinition {
+    override val fields = List(numRegForeignKeyFieldDef)
+  }
+
+  val numRegCollRefFieldDef = new CollectionReferenceFieldDefinition {
+    override val target = numRegDef
+  }
+
+  val numRegCollRefRegDef = new RegisterDefinition {
+    override val fields = List(numRegCollRefFieldDef)
+  }
+
   def newStorageManager(registerDefinitions: Seq[RegisterDefinition]) = {
     val context = getInstrumentation.getTargetContext
     context.deleteDatabase(testDbName)
@@ -43,6 +59,35 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
     val manager2 = newStorageManager(List(numRegDef))
     if (manager2.get(key).isDefined) {
       throw new AssertionError("Permanent storage?")
+    }
+  }
+
+  private def ensureIllegalArgumentExceptionThrown(expression: => Any) = {
+    try {
+      expression
+      throw new AssertionError("IllegalArgumentException expected. But nothing thrown")
+    }
+    catch {
+      case x: IllegalArgumentException => // This is OK
+      case x: Exception => throw new AssertionError(s"IllegalArgumentException expected. But ${x.getClass.getSimpleName} thrown")
+    }
+  }
+
+  def testThrowOnDuplicatedRegisterDefinition(): Unit = {
+    ensureIllegalArgumentExceptionThrown {
+      newStorageManager(List(numRegDef, numRegDef))
+    }
+  }
+
+  def testThrowIfExistingRegisterDefinitionWithOuterForeignKey(): Unit = {
+    ensureIllegalArgumentExceptionThrown {
+      newStorageManager(List(numRegRefRegDef))
+    }
+  }
+
+  def testThrowIfExistingRegisterDefinitionWithOuterCollectionReference(): Unit = {
+    ensureIllegalArgumentExceptionThrown {
+      newStorageManager(List(numRegCollRefRegDef))
     }
   }
 }
