@@ -3,6 +3,7 @@ package sword.langbook.android.db
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.test.InstrumentationTestCase
+import junit.framework.Assert
 import sword.db._
 
 class NoInitializedSqliteStorageManager(context :Context, dbName: String,
@@ -89,5 +90,37 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
     ensureIllegalArgumentExceptionThrown {
       newStorageManager(List(numRegCollRefRegDef))
     }
+  }
+
+  private def assertDefined[T](opt: Option[T]): Unit = {
+    Assert.assertTrue(opt.isDefined)
+  }
+
+  private def assertEquals(expected: Any, given: Any): Unit = {
+    Assert.assertEquals(expected, given)
+  }
+
+  def testInsertAndRetrieveRegisterWithGivenIdentifier(): Unit = {
+    val storageManager = newStorageManager(List(numRegDef))
+    val keyOption = storageManager.insert(numReg)
+    assertDefined(keyOption)
+
+    val regOption = storageManager.get(keyOption.get)
+    assertDefined(regOption)
+    assertEquals(numReg, regOption.get)
+  }
+
+  def testReturnValueMoreThanOnceForTheSameKey(): Unit = {
+    val storageManager = newStorageManager(List(numRegDef))
+    val keyOption = storageManager.insert(numReg)
+    assertDefined(keyOption)
+
+    val regOption1 = storageManager.get(keyOption.get)
+    assertDefined(regOption1)
+    assertEquals(numReg, regOption1.get)
+
+    val regOption2 = storageManager.get(keyOption.get)
+    assertDefined(regOption2)
+    assertEquals(numReg, regOption2.get)
   }
 }
