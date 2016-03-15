@@ -434,10 +434,15 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
   // TODO: This should check if it is referenced before removing
   private def delete(db: SQLiteDatabase, key: Key): Boolean = {
-    val query = s"DELETE FROM ${tableName(key.registerDefinition)} WHERE ${SQLiteStorageManager.idKey}=${key.index}"
-    logi(s"Executing query: $query")
-    db.execSQL(query)
-    true
+    if (get(db, key).isDefined) {
+      val query = s"DELETE FROM ${tableName(key.registerDefinition)} WHERE ${
+        SQLiteStorageManager.idKey
+      }=${key.index}"
+      logi(s"Executing query: $query")
+      db.execSQL(query)
+      true
+    }
+    else false
   }
 
   override def delete(key: Key): Boolean = {

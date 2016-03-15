@@ -100,6 +100,14 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
     Assert.assertEquals(expected, given)
   }
 
+  private def assertTrue(value: Boolean): Unit = {
+    Assert.assertTrue(value)
+  }
+
+  private def assertFalse(value: Boolean): Unit = {
+    Assert.assertFalse(value)
+  }
+
   def testInsertAndRetrieveRegisterWithGivenIdentifier(): Unit = {
     val storageManager = newStorageManager(List(numRegDef))
     val keyOption = storageManager.insert(numReg)
@@ -122,5 +130,22 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
     val regOption2 = storageManager.get(keyOption.get)
     assertDefined(regOption2)
     assertEquals(numReg, regOption2.get)
+  }
+
+  def testInsertAndDeleteRegisterWithGivenIdentifier(): Unit = {
+    val storageManager = newStorageManager(List(numRegDef))
+    val keyOption = storageManager.insert(numReg)
+    assertDefined(keyOption)
+
+    assertTrue(storageManager.delete(keyOption.get))
+  }
+
+  def testNotDeleteMoreThanOnceForTheSameKey(): Unit = {
+    val storageManager = newStorageManager(List(numRegDef))
+    val keyOption = storageManager.insert(numReg)
+    assertDefined(keyOption)
+
+    assertTrue(storageManager.delete(keyOption.get))
+    assertFalse(storageManager.delete(keyOption.get))
   }
 }
