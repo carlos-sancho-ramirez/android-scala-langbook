@@ -288,4 +288,27 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
     assertEmpty(manager.getKeysFor(numRegDef))
     assertEmpty(manager.getKeysFor(myRegDef))
   }
+
+  def testReturnNullSetBeforeInsertingAnything(): Unit = {
+    val manager = newStorageManager(List(numRegDef))
+    assertEmpty(manager.getKeysFor(numRegDef))
+  }
+
+  def testReturnJustTheKeyForTheInsertedRegister(): Unit = {
+    val manager = newStorageManager(List(numRegDef))
+    val key = assertDefined(manager.insert(numReg))
+
+    assertEquals(1, manager.getKeysFor(numRegDef).size)
+    assertTrue(manager.getKeysFor(numRegDef).contains(key))
+  }
+
+  def testReturnJustKeysForInsertedRegisters(): Unit = {
+    val manager = newStorageManager(List(numRegDef))
+    val key1 = assertDefined(manager.insert(numReg))
+    val key2 = assertDefined(manager.insert(numReg))
+
+    assertEquals(2, manager.getKeysFor(numRegDef).size)
+    assertTrue(manager.getKeysFor(numRegDef) contains key1)
+    assertTrue(manager.getKeysFor(numRegDef) contains key2)
+  }
 }
