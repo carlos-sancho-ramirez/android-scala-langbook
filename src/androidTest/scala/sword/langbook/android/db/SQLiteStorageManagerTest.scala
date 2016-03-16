@@ -80,6 +80,17 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
     }
   }
 
+  private def ensureUnsupportedOperationExceptionThrown(expression: => Any) = {
+    try {
+      expression
+      throw new AssertionError("UnsupportedOperationException expected. But nothing thrown")
+    }
+    catch {
+      case x: UnsupportedOperationException => // This is OK
+      case x: Exception => throw new AssertionError(s"UnsupportedOperationException expected. But ${x.getClass.getSimpleName} thrown")
+    }
+  }
+
   def testThrowOnDuplicatedRegisterDefinition(): Unit = {
     ensureIllegalArgumentExceptionThrown {
       newStorageManager(List(numRegDef, numRegDef))
@@ -226,5 +237,28 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
 
     assertEquals(list1.toSet, keys.filter(_.group == coll1Id).flatMap(manager.get).toSet)
     assertEquals(list2.toSet, keys.filter(_.group == coll2Id).flatMap(manager.get).toSet)
+  }
+
+  def testThrowUnsupportedOperationExceptionOnInsertingCollectionForNonCollectibleRegisters(): Unit = {
+    val myRegDef = new RegisterDefinition {
+      override val fields = List(UnicodeFieldDefinition)
+    }
+
+    val manager = newStorageManager(List(myRegDef))
+    class MyNumReg(value :Int) extends Register {
+      override val definition = myRegDef
+      override val fields = List(UnicodeField(value))
+    }
+
+    val reg1 = new MyNumReg(5)
+    val reg2 = new MyNumReg(7)
+    val reg3 = new MyNumReg(23)
+
+    val list = List(reg1, reg2, reg3)
+    ensureUnsupportedOperationExceptionThrown {
+      manager.insert(list)
+    }
+
+    assertTrue(manager.getKeysFor(myRegDef).isEmpty)
   }
 }
