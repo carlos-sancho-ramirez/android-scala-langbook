@@ -446,9 +446,30 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
   override def replace(register: Register, key: Key): Boolean = ???
 
-  // TODO: This should check if it is referenced before removing
+  private def existReference(db :SQLiteDatabase, key: Key, referencerRegDef: RegisterDefinition, referencerFieldDef: ForeignKeyFieldDefinition): Boolean = {
+    val whereClause = s"${fieldName(referencerRegDef, referencerFieldDef)}=${key.index}"
+    val cursor = db.query(tableName(referencerRegDef), Array(SQLiteStorageManager.idKey), whereClause, null, null, null, null, null)
+
+    if (cursor == null) false
+    else try {
+      cursor.getCount > 0
+    } finally {
+      cursor.close()
+    }
+  }
+
+  private def isReferenced(db: SQLiteDatabase, key: Key): Boolean = {
+    registerDefinitions.exists { regDef =>
+      regDef.fields.collect {
+        case x: ForeignKeyFieldDefinition if x.target == key.registerDefinition => x
+      } exists { fieldDef =>
+        existReference(db, key, regDef, fieldDef)
+      }
+    }
+  }
+
   private def delete(db: SQLiteDatabase, key: Key): Boolean = {
-    if (get(db, key).isDefined) {
+    if (get(db, key).isDefined && !isReferenced(db, key)) {
       val query = s"DELETE FROM ${tableName(key.registerDefinition)} WHERE ${
         SQLiteStorageManager.idKey
       }=${key.index}"

@@ -166,4 +166,23 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
 
     assertTrue(storageManager.insert(reg2).isEmpty)
   }
+
+  def testCannotDeleteRegisterPointedByAnother(): Unit = {
+    val storageManager = newStorageManager(List(numRegDef, numRegRefRegDef))
+    val insertedKey = assertDefined(storageManager.insert(numReg))
+
+    val reg2 = new Register {
+      override val fields = List(new ForeignKeyField {
+        override val key = insertedKey
+        override val definition = numRegForeignKeyFieldDef
+      })
+      override val definition = numRegRefRegDef
+    }
+
+    val key2 = assertDefined(storageManager.insert(reg2))
+
+    assertFalse(storageManager.delete(insertedKey))
+    assertTrue(storageManager.delete(key2))
+    assertTrue(storageManager.delete(insertedKey))
+  }
 }
