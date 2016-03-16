@@ -415,8 +415,13 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   }
 
   private def keysFor(db :SQLiteDatabase, regDef :RegisterDefinition) :Set[Key] = {
-    val cursor = db.query(tableName(regDef), Array(SQLiteStorageManager.idKey), null, null,
-        null, null, null, null)
+    val array = regDef match {
+      case _: CollectibleRegisterDefinition =>
+        Array(SQLiteStorageManager.idKey, SQLiteStorageManager.collKey)
+      case _ =>
+        Array(SQLiteStorageManager.idKey)
+    }
+    val cursor = db.query(tableName(regDef), array, null, null, null, null, null, null)
 
     if (cursor == null) Set()
     else try {
@@ -424,7 +429,11 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
       else {
         val buffer = new ListBuffer[Key]()
         do {
-          buffer += obtainKey(regDef, 0, cursor.getInt(0))
+          val group = regDef match {
+            case _: CollectibleRegisterDefinition => cursor.getInt(1)
+            case _ => 0
+          }
+          buffer += obtainKey(regDef, group, cursor.getInt(0))
         } while(cursor.moveToNext())
         val result = buffer.result().toSet
         logi(s"Called keysFor and returning $result")

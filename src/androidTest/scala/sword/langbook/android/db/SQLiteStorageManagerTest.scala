@@ -47,6 +47,11 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
     override val fields = List(numRegCollRefFieldDef)
   }
 
+  class NumRegister(value :Int) extends Register {
+    override val fields = List(UnicodeField(value))
+    override val definition = numRegDef
+  }
+
   def newStorageManager(registerDefinitions: Seq[RegisterDefinition]) = {
     val context = getInstrumentation.getTargetContext
     context.deleteDatabase(testDbName)
@@ -184,5 +189,22 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
     assertFalse(storageManager.delete(insertedKey))
     assertTrue(storageManager.delete(key2))
     assertTrue(storageManager.delete(insertedKey))
+  }
+
+  def testInsertCollectionInSingleOperation(): Unit = {
+    val manager = newStorageManager(List(numRegDef))
+    val reg1 = new NumRegister(5)
+    val reg2 = new NumRegister(7)
+    val reg3 = new NumRegister(23)
+
+    val list = List(reg1, reg2, reg3)
+    val collId = assertDefined(manager.insert(list))
+
+    val keys = manager.getKeysFor(reg1.definition)
+    assertEquals(list.size, keys.size)
+
+    for (key <- keys) {
+      assertEquals(collId, key.group)
+    }
   }
 }
