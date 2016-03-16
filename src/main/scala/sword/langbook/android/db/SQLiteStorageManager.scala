@@ -289,6 +289,10 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   }
 
   override def get(key :Key) = {
+    if (key.storageManager != this) {
+      throw new IllegalArgumentException("This key do not belong to this storage manager")
+    }
+
     val db = getReadableDatabase
     try {
       get(db, key)

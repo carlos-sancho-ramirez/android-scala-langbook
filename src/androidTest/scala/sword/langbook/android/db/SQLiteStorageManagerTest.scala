@@ -55,9 +55,10 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
 
   def testAlwaysClean(): Unit = {
     val manager1 = newStorageManager(List(numRegDef))
-    val key = manager1.insert(numReg).get
+    val encodedKey = manager1.insert(numReg).get.encoded
 
     val manager2 = newStorageManager(List(numRegDef))
+    val key = manager2.decode(encodedKey).get
     if (manager2.get(key).isDefined) {
       throw new AssertionError("Permanent storage?")
     }
@@ -92,8 +93,9 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
     }
   }
 
-  private def assertDefined[T](opt: Option[T]): Unit = {
+  private def assertDefined[T](opt: Option[T]): T = {
     Assert.assertTrue(opt.isDefined)
+    opt.get
   }
 
   private def assertEquals(expected: Any, given: Any): Unit = {
@@ -110,42 +112,42 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
 
   def testInsertAndRetrieveRegisterWithGivenIdentifier(): Unit = {
     val storageManager = newStorageManager(List(numRegDef))
-    val keyOption = storageManager.insert(numReg)
-    assertDefined(keyOption)
-
-    val regOption = storageManager.get(keyOption.get)
-    assertDefined(regOption)
-    assertEquals(numReg, regOption.get)
+    val key = assertDefined(storageManager.insert(numReg))
+    val reg = assertDefined(storageManager.get(key))
+    assertEquals(numReg, reg)
   }
 
   def testReturnValueMoreThanOnceForTheSameKey(): Unit = {
     val storageManager = newStorageManager(List(numRegDef))
-    val keyOption = storageManager.insert(numReg)
-    assertDefined(keyOption)
+    val key = assertDefined(storageManager.insert(numReg))
 
-    val regOption1 = storageManager.get(keyOption.get)
-    assertDefined(regOption1)
-    assertEquals(numReg, regOption1.get)
+    val reg1 = assertDefined(storageManager.get(key))
+    assertEquals(numReg, reg1)
 
-    val regOption2 = storageManager.get(keyOption.get)
-    assertDefined(regOption2)
-    assertEquals(numReg, regOption2.get)
+    val reg2 = assertDefined(storageManager.get(key))
+    assertEquals(numReg, reg2)
   }
 
   def testInsertAndDeleteRegisterWithGivenIdentifier(): Unit = {
     val storageManager = newStorageManager(List(numRegDef))
-    val keyOption = storageManager.insert(numReg)
-    assertDefined(keyOption)
-
-    assertTrue(storageManager.delete(keyOption.get))
+    val key = assertDefined(storageManager.insert(numReg))
+    assertTrue(storageManager.delete(key))
   }
 
   def testNotDeleteMoreThanOnceForTheSameKey(): Unit = {
     val storageManager = newStorageManager(List(numRegDef))
-    val keyOption = storageManager.insert(numReg)
-    assertDefined(keyOption)
+    val key = assertDefined(storageManager.insert(numReg))
+    assertTrue(storageManager.delete(key))
+    assertFalse(storageManager.delete(key))
+  }
 
-    assertTrue(storageManager.delete(keyOption.get))
-    assertFalse(storageManager.delete(keyOption.get))
+  def testNotAcceptKeysGeneratedByAnotherStorageManagerInstance(): Unit = {
+    val storageManagerA = newStorageManager(List(numRegDef))
+    val storageManagerB = newStorageManager(List(numRegDef))
+    val key = assertDefined(storageManagerA.insert(numReg))
+
+    ensureIllegalArgumentExceptionThrown {
+      storageManagerB.get(key)
+    }
   }
 }
