@@ -118,6 +118,10 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
     Assert.assertEquals(expected, given)
   }
 
+  private def assertEmpty[T](coll: Traversable[T]): Unit = {
+    Assert.assertTrue(coll.isEmpty)
+  }
+
   private def assertTrue(value: Boolean): Unit = {
     Assert.assertTrue(value)
   }
@@ -180,7 +184,7 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
       override val definition = numRegRefRegDef
     }
 
-    assertTrue(storageManager.insert(reg2).isEmpty)
+    assertEmpty(storageManager.insert(reg2))
   }
 
   def testCannotDeleteRegisterPointedByAnother(): Unit = {
@@ -259,6 +263,29 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
       manager.insert(list)
     }
 
-    assertTrue(manager.getKeysFor(myRegDef).isEmpty)
+    assertEmpty(manager.getKeysFor(myRegDef))
+  }
+
+  def testThrowUnsupportedOperationExceptionOnInsertingCollectionWithDifferentCollectibleRegistersDefinitions(): Unit = {
+    val myRegDef = new CollectibleRegisterDefinition {
+      override val fields = List(UnicodeFieldDefinition)
+    }
+
+    val manager = newStorageManager(List(numRegDef, myRegDef))
+    class MyNumReg(value :Int) extends Register {
+      override val definition = myRegDef
+      override val fields = List(UnicodeField(value))
+    }
+
+    val reg1 = new NumRegister(5)
+    val reg2 = new MyNumReg(7)
+
+    val list = List(reg1, reg2)
+    ensureUnsupportedOperationExceptionThrown {
+      manager.insert(list)
+    }
+
+    assertEmpty(manager.getKeysFor(numRegDef))
+    assertEmpty(manager.getKeysFor(myRegDef))
   }
 }
