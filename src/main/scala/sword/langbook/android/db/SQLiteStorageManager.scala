@@ -336,14 +336,24 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
   }
 
+  private def hasValidReference(db :SQLiteDatabase, register :Register) :Boolean = {
+    val fields = register.fields.collect { case field :ForeignKeyField => field }
+    fields.isEmpty || fields.forall { field =>
+      get(db, field.key).isDefined
+    }
+  }
+
   private def insert(db :SQLiteDatabase, register: Register): Option[Key] = {
-    val regDef = register.definition
-    val keys = regDef.fields.map(fieldName(regDef,_)).mkString(", ")
-    val values = register.fields.map(sqlValue).mkString(", ")
-    val query = s"INSERT INTO ${tableName(register)} ($keys) VALUES ($values)"
-    logi(s"Executing query: $query")
-    db.execSQL(query)
-    find(db, register).lastOption
+    if (hasValidReference(db, register)) {
+      val regDef = register.definition
+      val keys = regDef.fields.map(fieldName(regDef, _)).mkString(", ")
+      val values = register.fields.map(sqlValue).mkString(", ")
+      val query = s"INSERT INTO ${tableName(register)} ($keys) VALUES ($values)"
+      logi(s"Executing query: $query")
+      db.execSQL(query)
+      find(db, register).lastOption
+    }
+    else None
   }
 
   private def insert(db :SQLiteDatabase, coll :Register.CollectionId, register: Register): Unit = {

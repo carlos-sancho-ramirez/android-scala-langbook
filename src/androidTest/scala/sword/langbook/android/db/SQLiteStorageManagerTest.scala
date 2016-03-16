@@ -150,4 +150,20 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
       storageManagerB.get(key)
     }
   }
+
+  def testCannotInsertARegisterPointingToNothing(): Unit = {
+    val storageManager = newStorageManager(List(numRegDef, numRegRefRegDef))
+    val numRegKey = assertDefined(storageManager.insert(numReg))
+    assertTrue(storageManager.delete(numRegKey))
+
+    val reg2 = new Register {
+      override val fields = List(new ForeignKeyField {
+        override val key = numRegKey
+        override val definition = numRegForeignKeyFieldDef
+      })
+      override val definition = numRegRefRegDef
+    }
+
+    assertTrue(storageManager.insert(reg2).isEmpty)
+  }
 }
