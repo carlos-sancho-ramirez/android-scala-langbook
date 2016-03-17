@@ -26,8 +26,10 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
     override val fields = List(UnicodeFieldDefinition)
   }
 
+  val numRegFieldValue = 0x40
+
   val numReg = new Register {
-    override val fields = List(UnicodeField(0x40))
+    override val fields = List(UnicodeField(numRegFieldValue))
     override val definition = numRegDef
   }
 
@@ -310,5 +312,20 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
     assertEquals(2, manager.getKeysFor(numRegDef).size)
     assertTrue(manager.getKeysFor(numRegDef) contains key1)
     assertTrue(manager.getKeysFor(numRegDef) contains key2)
+  }
+
+  def testReplaceOneRegisterByAnotherWithSameDefinition(): Unit = {
+    val storageManager = newStorageManager(List(numRegDef))
+    val key = assertDefined(storageManager.insert(numReg))
+
+    val regB = new Register {
+      override val fields = List(UnicodeField(numRegFieldValue + 1))
+      override val definition = numRegDef
+    }
+    assertFalse(numReg == regB)
+    assertTrue(storageManager.replace(regB, key))
+
+    val reg = assertDefined(storageManager.get(key))
+    assertEquals(regB, reg)
   }
 }

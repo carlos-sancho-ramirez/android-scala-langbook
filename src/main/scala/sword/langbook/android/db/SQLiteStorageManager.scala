@@ -453,7 +453,30 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
   }
 
-  override def replace(register: Register, key: Key): Boolean = ???
+  private def replace(db: SQLiteDatabase, register: Register, key: Key): Boolean = {
+    val currentOption = get(db, key)
+    if (currentOption.isDefined) {
+      val expr = register.fields.map(f => s"${fieldName(register.definition, f)}=${sqlValue(f)}")
+        .mkString(", ")
+      val query = s"UPDATE ${tableName(key.registerDefinition)} SET $expr WHERE ${
+        SQLiteStorageManager.idKey
+      }=${key.index}"
+      logi(s"Executing query: $query")
+      db.execSQL(query)
+
+      true
+    }
+    else false
+  }
+
+  override def replace(register: Register, key: Key): Boolean = {
+    val db = getWritableDatabase
+    try {
+      replace(db, register, key)
+    } finally {
+      db.close()
+    }
+  }
 
   private def existReference(db :SQLiteDatabase, key: Key, referencerRegDef: RegisterDefinition, referencerFieldDef: ForeignKeyFieldDefinition): Boolean = {
     val whereClause = s"${fieldName(referencerRegDef, referencerFieldDef)}=${key.index}"
