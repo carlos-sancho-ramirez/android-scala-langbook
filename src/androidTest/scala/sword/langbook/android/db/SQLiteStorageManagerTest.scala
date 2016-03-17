@@ -328,4 +328,18 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
     val reg = assertDefined(storageManager.get(key))
     assertEquals(regB, reg)
   }
+
+  def testNotReplaceRegisterWhenKeyNotDefinedPreviously(): Unit = {
+    val storageManager = newStorageManager(List(numRegDef))
+    val key = assertDefined(storageManager.insert(numReg))
+
+    val regB = new Register {
+      override val fields = List(UnicodeField(numRegFieldValue + 1))
+      override val definition = numRegDef
+    }
+    assertFalse(numReg == regB)
+
+    assertTrue(storageManager.delete(key))
+    assertFalse(storageManager.replace(regB, key))
+  }
 }
