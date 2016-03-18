@@ -362,4 +362,22 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
       assertEquals(expected.toSet, keys.flatMap(manager.get).map(_.fields.head.asInstanceOf[UnicodeField].value))
     }
   }
+
+  def testReturnMapContainingAllInsertedRegistersGroupedByKey(): Unit = {
+    val manager = newStorageManager(List(numRegDef))
+    val inserted = for (i <- 0 until 10) yield {
+      val reg = new Register {
+        override val fields = List(UnicodeField(i))
+        override val definition = numRegDef
+      }
+      assertDefined(manager.insert(reg).map(key => (key, reg)))
+    }
+
+    val map = manager.getMapFor(numRegDef)
+    assertEquals(inserted.size, map.size)
+    for (insertion <- inserted) {
+      val opt = assertDefined(map.get(insertion._1))
+      assertEquals(insertion._2, opt)
+    }
+  }
 }
