@@ -400,4 +400,33 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
       assertEquals(expected.toSet, regs.values.map(_.fields.head.asInstanceOf[UnicodeField].value).toSet)
     }
   }
+
+  def testReturnKeysContainingSameStorageManagerInstance(): Unit = {
+    val manager = newStorageManager(List(numRegDef))
+    val key = assertDefined(manager.insert(numReg))
+    assertEquals(manager, key.storageManager)
+  }
+
+  def testEncodeKeyAndDecodeItBack(): Unit = {
+    val manager = newStorageManager(List(numRegDef))
+    val key = assertDefined(manager.insert(numReg))
+
+    val str = manager.encode(key)
+    val newKey = assertDefined(manager.decode(str))
+    assertEquals(key, newKey)
+  }
+
+  def testEncodeKeyAndDecodeItFromAnotherInstanceWithSameTypeAndConfiguration() = {
+    val managerA = newStorageManager(List(numRegDef))
+    val keyA = assertDefined(managerA.insert(numReg))
+
+    val str = managerA.encode(keyA)
+
+    val managerB = newStorageManager(List(numRegDef))
+    val keyB = assertDefined(managerB.decode(str))
+    assertEquals(managerB, keyB.storageManager)
+
+    assertEquals(keyA.index, keyB.index)
+    assertEquals(keyA.group, keyB.group)
+  }
 }
