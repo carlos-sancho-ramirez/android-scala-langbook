@@ -380,4 +380,24 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
       assertEquals(insertion._2, opt)
     }
   }
+
+  def testReturnMapMatchingAllRegistersWithTheirKeysForGivenCollectionId() = {
+    val manager = newStorageManager(List(numRegDef))
+    val groups = List[Int](1,2,3,1,2,1,3)
+    val collections = groups.indices.map(_ + 1).zip(groups).groupBy { case (_,group) => group }
+      .flatMap { case (group, items) =>
+        val regs = items.map { case (index,_) => new Register {
+          override val fields = List(UnicodeField(index))
+          override val definition = numRegDef
+        }}
+
+        manager.insert(regs).map(id => (group, id))
+      }
+
+    for (group <- groups.toSet[Int]) {
+      val expected = groups.indices.zip(groups).filter { case (_,g) => g == group } map { x => x._1 + 1 }
+      val regs = manager.getMapForCollection(numRegDef, collections.find(_._1 == group).head._2)
+      assertEquals(expected.toSet, regs.values.map(_.fields.head.asInstanceOf[UnicodeField].value).toSet)
+    }
+  }
 }

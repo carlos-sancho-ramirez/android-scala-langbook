@@ -248,7 +248,38 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
   }
 
-  override def getMapForCollection(registerDefinition: CollectibleRegisterDefinition, id: CollectionId): Map[Key, Register] = ???
+  private def getMapForCollection(db: SQLiteDatabase,
+      registerDefinition: CollectibleRegisterDefinition, id: CollectionId): Map[Key, Register] = {
+    val keys = Seq(SQLiteStorageManager.idKey) ++ registerDefinition.fields.map(fieldName(registerDefinition,_))
+    val cursor = db.query(tableName(registerDefinition), keys.toArray,
+      s"${SQLiteStorageManager.collKey}=${id.toString}", null, null, null, null, null)
+
+    val result = scala.collection.mutable.Map[Key, Register]()
+    if (cursor != null) {
+      try {
+        if (cursor.getCount > 0 && cursor.moveToFirst()) {
+          do {
+            val thisKey = obtainKey(registerDefinition, id, cursor.getInt(0))
+            result += ((thisKey, fromCursor(registerDefinition, cursor)))
+          } while(cursor.moveToNext())
+        }
+        else Some(fromCursor(registerDefinition, cursor))
+      } finally {
+        cursor.close()
+      }
+    }
+
+    result.toMap
+  }
+
+  override def getMapForCollection(registerDefinition: CollectibleRegisterDefinition, id: CollectionId): Map[Key, Register] = {
+    val db = getReadableDatabase
+    try {
+      getMapForCollection(db, registerDefinition, id)
+    } finally {
+      db.close()
+    }
+  }
 
   private def fromCursor(regDef :RegisterDefinition, cursor :Cursor) :Register = {
     val resultFields = for (fieldDef <- regDef.fields) yield {
