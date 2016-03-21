@@ -396,6 +396,16 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     db.execSQL(query)
   }
 
+  override def insert(collectionId :Register.CollectionId, register :Register) = {
+    val db = getWritableDatabase
+    try {
+      insert(db, collectionId, register)
+      find(db, register).lastOption
+    } finally {
+      db.close()
+    }
+  }
+
   override def insert(register: Register): Option[Key] = {
     val db = getWritableDatabase
     try {

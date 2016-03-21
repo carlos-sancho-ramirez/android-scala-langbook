@@ -225,6 +225,26 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
     }
   }
 
+  def testInsertRegisterIntoAnExistingCollection():Unit = {
+    val manager = newStorageManager(List(numRegDef))
+    val reg1 = new NumRegister(5)
+    val reg2 = new NumRegister(7)
+    val reg3 = new NumRegister(23)
+
+    val list = List(reg1, reg2, reg3)
+    val collId = manager.insert(list).get
+
+    val reg4 = new NumRegister(14)
+    assertDefined(manager.insert(collId, reg4))
+
+    val keys = manager.getKeysFor(reg1.definition)
+    assertEquals(4, keys.size)
+
+    for (key <- keys) {
+      assertEquals(collId, key.group)
+    }
+  }
+
   def testInsertMoreThanOneCollection(): Unit = {
     val manager = newStorageManager(List(numRegDef))
     val reg1 = new NumRegister(5)
