@@ -74,7 +74,7 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
       val translations = word.translations.flatMap(_.text.values.headOption).mkString(", ")
       if (translations.nonEmpty) {
         // TODO: Improve this UI and avoid hardcode strings
-        findView(TR.synonymsText).setText(s"Translations: $translations")
+        findView(TR.translationsText).setText(s"Translations: $translations")
       }
     }
   }
