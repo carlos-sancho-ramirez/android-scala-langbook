@@ -48,7 +48,7 @@ class LanguageSelector extends BaseActivity with Toolbar.OnMenuItemClickListener
       val language = items(position)
       val text = language.concept.wordsForLanguage(language).headOption
           .flatMap(_.text.values.headOption).getOrElse("")
-      view.findView(TR.entryCaption).setText(text)
+      view.findView(TR.selectorEntryCaption).setText(text)
       view
     }
   }

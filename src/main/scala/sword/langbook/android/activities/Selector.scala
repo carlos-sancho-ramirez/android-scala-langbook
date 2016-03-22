@@ -44,7 +44,7 @@ class Selector extends BaseActivity with AdapterView.OnItemClickListener with Se
       // TODO: Remove this assumption
       val text = items(position).pieces.flatMap(_.values.headOption).flatMap(x => x)
           .map(_.unicode.toChar).mkString("")
-      view.findView(TR.entryCaption).setText(text)
+      view.findView(TR.selectorEntryCaption).setText(text)
       view
     }
   }
