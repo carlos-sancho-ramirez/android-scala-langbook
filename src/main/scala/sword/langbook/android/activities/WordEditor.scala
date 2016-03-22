@@ -53,8 +53,9 @@ class WordEditor extends BaseActivity with View.OnClickListener {
 
     if (savedInstanceState != null) {
       _languageEncodedKey = savedInstanceState.getString(BundleKeys.languageKey)
-      updateUi()
     }
+
+    updateUi()
   }
 
   override def onActivityResult(requestCode :Int, resultCode :Int, data :Intent) :Unit = {
@@ -73,20 +74,23 @@ class WordEditor extends BaseActivity with View.OnClickListener {
   }
 
   private def updateUi(): Unit = {
-    val container = findView(TR.entryContainer)
-    container.removeAllViews()
-    val inflater = getLayoutInflater
+    val langKeyOpt = languageKeyOpt
+    if (langKeyOpt.isDefined) {
+      val container = findView(TR.entryContainer)
+      container.removeAllViews()
+      val inflater = getLayoutInflater
 
-    for {
-      languageKey <- languageKeyOpt
-      alphabet <- Language(languageKey).alphabets
-      // TODO: This must be changed to pick the proper alphabet
-      alphabetWord <- alphabet.concept.words.headOption
-      alphabetText <- alphabetWord.text.values.headOption
-    } {
-      val entry = inflater.inflate(TR.layout.word_editor_entry, container, true)
-      entry.setTag(alphabet)
-      entry.findView(TR.fieldTitle).setText(alphabetText)
+      for {
+        languageKey <- langKeyOpt
+        alphabet <- Language(languageKey).alphabets
+        // TODO: This must be changed to pick the proper alphabet
+        alphabetWord <- alphabet.concept.words.headOption
+        alphabetText <- alphabetWord.text.values.headOption
+      } {
+        val entry = inflater.inflate(TR.layout.word_editor_entry, container)
+        entry.setTag(alphabet)
+        entry.findView(TR.fieldTitle).setText(alphabetText)
+      }
     }
   }
 
