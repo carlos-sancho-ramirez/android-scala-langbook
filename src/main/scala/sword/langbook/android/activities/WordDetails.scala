@@ -41,12 +41,10 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
     for {
       word <- wordOption
     } {
-      // Assumed for now that all words have the first alphabet and language and are the ones to be
-      // displayed
-      // TODO: Remove this assumption
-      val text = word.pieces.flatMap(_.values.headOption).flatMap(x => x)
-        .map(_.unicode.toChar).mkString("")
-      toolBar.setTitle(text)
+      val language = word.language
+      val preferredAlphabet = language.preferredAlphabet
+
+      toolBar.setTitle(word.text.getOrElse(preferredAlphabet, ""))
 
       val alphabetStr = word.text.flatMap {
         case (alphabet, thisText) =>
@@ -55,23 +53,21 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
       }.mkString("\n")
       findView(TR.alphabetText).setText(alphabetStr)
 
-      val language = word.language
       for {
         word <- language.concept.wordsForLanguage(language).headOption
-        // TODO: Select the most suitable alphabet instead of the first one
-        text <- word.text.values.headOption
+        text <- word.text.get(preferredAlphabet)
       } {
         // TODO: Improve this UI and avoid hardcode strings
         findView(TR.languageText).setText(s"Language: $text")
       }
 
-      val synonyms = word.synonyms.flatMap(_.text.values.headOption).mkString(", ")
+      val synonyms = word.synonyms.flatMap(_.text.get(preferredAlphabet)).mkString(", ")
       if (synonyms.nonEmpty) {
         // TODO: Improve this UI and avoid hardcode strings
         findView(TR.synonymsText).setText(s"Synonyms: $synonyms")
       }
 
-      val translations = word.translations.flatMap(_.text.values.headOption).mkString(", ")
+      val translations = word.translations.flatMap(w => w.text.get(w.language.preferredAlphabet)).mkString(", ")
       if (translations.nonEmpty) {
         // TODO: Improve this UI and avoid hardcode strings
         findView(TR.translationsText).setText(s"Translations: $translations")
