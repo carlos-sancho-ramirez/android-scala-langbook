@@ -128,23 +128,24 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
       } yield (symbol, key)
     }.toMap
 
-    val englishConceptKey = insertConcept("English").get
-    val spanishConceptKey = insertConcept("Spanish").get
-    val japaneseConceptKey = insertConcept("Japanese").get
-
-    val englishKey = insert(db, registers.Language(englishConceptKey)).get
     val enAlphabetConceptKey = insertConcept("English alphabet").get
     val enAlphabetKey = insert(db, registers.Alphabet(enAlphabetConceptKey)).get
 
-    val spanishKey = insert(db, registers.Language(spanishConceptKey)).get
     val spAlphabetConceptKey = insertConcept("Spanish alphabet").get
     val spAlphabetKey = insert(db, registers.Alphabet(spAlphabetConceptKey)).get
 
-    val japaneseKey = insert(db, registers.Language(japaneseConceptKey)).get
     val kanjiAlphabetConceptKey = insertConcept("Kanji alphabet").get
     val kanjiAlphabetKey = insert(db, registers.Alphabet(kanjiAlphabetConceptKey)).get
     val kanaAlphabetConceptKey = insertConcept("Kana alphabet").get
     val kanaAlphabetKey = insert(db, registers.Alphabet(kanaAlphabetConceptKey)).get
+
+    val englishConceptKey = insertConcept("English").get
+    val spanishConceptKey = insertConcept("Spanish").get
+    val japaneseConceptKey = insertConcept("Japanese").get
+
+    val englishKey = insert(db, registers.Language(englishConceptKey, enAlphabetKey)).get
+    val spanishKey = insert(db, registers.Language(spanishConceptKey, spAlphabetKey)).get
+    val japaneseKey = insert(db, registers.Language(japaneseConceptKey, kanjiAlphabetKey)).get
 
     val englishEnSymbolArrayCollection = insert(db, englishEnText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
     val englishSpSymbolArrayCollection = insert(db, englishSpText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
