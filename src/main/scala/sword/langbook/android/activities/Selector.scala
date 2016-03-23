@@ -38,12 +38,8 @@ class Selector extends BaseActivity with AdapterView.OnItemClickListener with Se
     override def getView(position: Int, convertView: View, parent: ViewGroup) = {
       val view = if (convertView != null) convertView
       else LayoutInflater.from(parent.getContext).inflate(R.layout.selector_entry, parent, false)
-
-      // Assumed for now that all words have the first alphabet and language and are the ones to be
-      // displayed
-      // TODO: Remove this assumption
-      val text = items(position).pieces.flatMap(_.values.headOption).flatMap(x => x)
-          .map(_.unicode.toChar).mkString("")
+      val word = items(position)
+      val text = word.text.getOrElse(word.language.preferredAlphabet, "")
       view.findView(TR.selectorEntryCaption).setText(text)
       view
     }
