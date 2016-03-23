@@ -83,9 +83,8 @@ class WordEditor extends BaseActivity with View.OnClickListener {
       for {
         languageKey <- langKeyOpt
         alphabet <- Language(languageKey).alphabets
-        // TODO: This must be changed to pick the proper alphabet
         alphabetWord <- alphabet.concept.words.headOption
-        alphabetText <- alphabetWord.text.values.headOption
+        alphabetText <- alphabetWord.text.get(Language(languageKey).preferredAlphabet)
       } {
         val entry = inflater.inflate(TR.layout.word_editor_entry, container)
         entry.setTag(alphabet)
