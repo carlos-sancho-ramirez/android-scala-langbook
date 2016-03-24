@@ -2,9 +2,10 @@ package sword.langbook.android.activities
 
 import android.support.v7.widget.RecyclerView
 import android.view.ViewGroup
+import sword.langbook.db.Word
 
 case class WordDetailsAdapter(alphabets: IndexedSeq[String], language: String,
-    synonyms: IndexedSeq[String], translations: IndexedSeq[String])
+    synonyms: IndexedSeq[Word], translations: IndexedSeq[Word])
     extends RecyclerView.Adapter[WordDetailsViewHolder] {
 
   val alphabetsSectionCount = 1 + alphabets.size
@@ -80,8 +81,12 @@ case class WordDetailsAdapter(alphabets: IndexedSeq[String], language: String,
         val text = currentSection match {
           case sectionTitles.alphabets => alphabets(relPosition)
           case sectionTitles.language => language
-          case sectionTitles.synonyms => synonyms(relPosition)
-          case sectionTitles.translations => translations(relPosition)
+          case sectionTitles.synonyms =>
+            val synonym = synonyms(relPosition)
+            synonym.text(synonym.language.preferredAlphabet)
+          case sectionTitles.translations =>
+            val translation = translations(relPosition)
+            translation.text(translation.language.preferredAlphabet)
         }
 
         holder.textView.setText(text)
