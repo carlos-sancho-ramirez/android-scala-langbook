@@ -3,35 +3,85 @@ package sword.langbook.android.activities
 import android.support.v7.widget.RecyclerView
 import android.view.ViewGroup
 
-case class WordDetailsAdapter(alphabets: String, language: String, synonyms: String, translations: String) extends RecyclerView.Adapter[WordDetailsViewHolder] {
+case class WordDetailsAdapter(alphabets: IndexedSeq[String], language: String,
+    synonyms: IndexedSeq[String], translations: IndexedSeq[String])
+    extends RecyclerView.Adapter[WordDetailsViewHolder] {
 
-  // TODO: This should not be using 4 strings, but a dynamical growing structure
+  val alphabetsSectionCount = 1 + alphabets.size
+  val languageSectionCount = 2
+  val synonymsSectionCount = {
+    val size = synonyms.size
+    if (size > 0) 1 + synonyms.size
+    else 0
+  }
 
-  val sectionTitles = List("Alphabets", "Language", "Synonyms", "Translations")
+  val translationsSectionCount = {
+    val size = translations.size
+    if (size > 0) 1 + translations.size
+    else 0
+  }
 
-  val sectionPositions = Map(0 -> 0, 2 -> 1, 4 -> 2, 6 -> 3)
+  // TODO: This titles should not be hardcoded
+  object sectionTitles {
+    val alphabets = "Alphabets"
+    val language = "Language"
+    val synonyms = "Synonyms"
+    val translations = "Translations"
+  }
 
-  override val getItemCount = 8
+  val sectionHeaderPositions = {
+    val map = scala.collection.mutable.Map(0 -> sectionTitles.alphabets,
+      alphabetsSectionCount -> sectionTitles.language)
+    var currentPos = alphabetsSectionCount + languageSectionCount
 
-  override def getItemViewType(position: Int) = position % 2
+    if (synonymsSectionCount > 0) {
+      map += currentPos -> sectionTitles.synonyms
+      currentPos += synonymsSectionCount
+    }
+
+    if (translationsSectionCount > 0) {
+      map += currentPos -> sectionTitles.translations
+      currentPos += translationsSectionCount
+    }
+
+    map.toMap
+  }
+
+  override val getItemCount = {
+    alphabetsSectionCount + languageSectionCount + synonymsSectionCount + translationsSectionCount
+  }
+
+  object ViewTypes {
+    val header = 0
+    val entry = 1
+  }
+
+  override def getItemViewType(position: Int) = {
+    if (sectionHeaderPositions.contains(position)) ViewTypes.header
+    else ViewTypes.entry
+  }
 
   override def onCreateViewHolder(viewGroup: ViewGroup, viewType: Int): WordDetailsViewHolder = {
     viewType match {
-      case 0 => WordDetailsSectionHeaderViewHolder.newInstance(viewGroup)
-      case 1 => WordDetailsSectionEntryViewHolder.newInstance(viewGroup)
+      case ViewTypes.header => WordDetailsSectionHeaderViewHolder.newInstance(viewGroup)
+      case ViewTypes.entry => WordDetailsSectionEntryViewHolder.newInstance(viewGroup)
     }
   }
 
   override def onBindViewHolder(vh: WordDetailsViewHolder, position: Int): Unit = {
     vh match {
       case holder: WordDetailsSectionHeaderViewHolder =>
-        holder.textView.setText(sectionTitles(sectionPositions(position)))
+        holder.textView.setText(sectionHeaderPositions(position))
       case holder: WordDetailsSectionEntryViewHolder =>
-        val text = position match {
-          case 1 => alphabets
-          case 3 => language
-          case 5 => synonyms
-          case 7 => translations
+        val currentHeaderPosition = sectionHeaderPositions.keys.filter(_ < position).max
+        val currentSection = sectionHeaderPositions(currentHeaderPosition)
+        val relPosition = position - currentHeaderPosition - 1
+
+        val text = currentSection match {
+          case sectionTitles.alphabets => alphabets(relPosition)
+          case sectionTitles.language => language
+          case sectionTitles.synonyms => synonyms(relPosition)
+          case sectionTitles.translations => translations(relPosition)
         }
 
         holder.textView.setText(text)

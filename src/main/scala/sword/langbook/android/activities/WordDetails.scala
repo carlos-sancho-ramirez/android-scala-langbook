@@ -48,10 +48,10 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
   }
 
   def updateAdapter(): Unit = {
-    var alphabetText = ""
+    var alphabetStrings = Vector[String]()
     var languageText = ""
-    var synonymsText = ""
-    var translationsText = ""
+    var synonymStrings = Vector[String]()
+    var translationStrings = Vector[String]()
 
     for {
       word <- wordOption
@@ -59,34 +59,24 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
       val language = word.language
       val preferredAlphabet = language.preferredAlphabet
 
-      alphabetText = word.text.flatMap {
+      alphabetStrings = word.text.flatMap {
         case (alphabet, thisText) =>
           val alphabetText = alphabet.concept.words.headOption.flatMap(_.text.values.headOption)
           alphabetText.map(alphabetText => s"$alphabetText: $thisText")
-      }.mkString("\n")
+      }.toVector
 
       for {
         word <- language.concept.wordsForLanguage(language).headOption
         text <- word.text.get(preferredAlphabet)
       } {
-        // TODO: Improve this UI and avoid hardcode strings
-        languageText = s"Language: $text"
+        languageText = text
       }
 
-      val synonyms = word.synonyms.flatMap(_.text.get(preferredAlphabet)).mkString(", ")
-      if (synonyms.nonEmpty) {
-        // TODO: Improve this UI and avoid hardcode strings
-        synonymsText = s"Synonyms: $synonyms"
-      }
-
-      val translations = word.translations.flatMap(w => w.text.get(w.language.preferredAlphabet)).mkString(", ")
-      if (translations.nonEmpty) {
-        // TODO: Improve this UI and avoid hardcode strings
-        translationsText =  s"Translations: $translations"
-      }
+      synonymStrings = word.synonyms.flatMap(_.text.get(preferredAlphabet)).toVector
+      translationStrings = word.translations.flatMap(w => w.text.get(w.language.preferredAlphabet)).toVector
     }
 
-    findView(TR.recyclerView).setAdapter(new WordDetailsAdapter(alphabetText, languageText, synonymsText, translationsText))
+    findView(TR.recyclerView).setAdapter(new WordDetailsAdapter(alphabetStrings, languageText, synonymStrings, translationStrings))
   }
 
   def updateMenu(menu :Menu) = {
