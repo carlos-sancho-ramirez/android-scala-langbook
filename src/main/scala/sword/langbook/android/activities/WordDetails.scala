@@ -3,7 +3,7 @@ package sword.langbook.android.activities
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
-import android.support.v7.widget.Toolbar
+import android.support.v7.widget.{LinearLayoutManager, Toolbar}
 import android.view.{MenuItem, Menu}
 import sword.langbook.android.{TR, R}
 import sword.langbook.db.Word
@@ -29,14 +29,29 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
   override def onCreate(savedInstanceState :Bundle) :Unit = {
     super.onCreate(savedInstanceState)
     setContentView(R.layout.word_details)
+    findView(TR.recyclerView).setLayoutManager(new LinearLayoutManager(this))
     updateUi()
   }
 
   def updateUi(): Unit = {
+    val title = wordOption.map {
+      word =>
+        word.text.getOrElse(word.language.preferredAlphabet, "")
+    }.getOrElse(getString(R.string.appName))
+
     val toolBar = findView(TR.toolBar)
-    toolBar.setTitle(R.string.appName)
+    toolBar.setTitle(title)
     toolBar.setOnMenuItemClickListener(this)
     updateMenu(toolBar.getMenu)
+
+    updateAdapter()
+  }
+
+  def updateAdapter(): Unit = {
+    var alphabetText = ""
+    var languageText = ""
+    var synonymsText = ""
+    var translationsText = ""
 
     for {
       word <- wordOption
@@ -44,35 +59,34 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
       val language = word.language
       val preferredAlphabet = language.preferredAlphabet
 
-      toolBar.setTitle(word.text.getOrElse(preferredAlphabet, ""))
-
-      val alphabetStr = word.text.flatMap {
+      alphabetText = word.text.flatMap {
         case (alphabet, thisText) =>
           val alphabetText = alphabet.concept.words.headOption.flatMap(_.text.values.headOption)
           alphabetText.map(alphabetText => s"$alphabetText: $thisText")
       }.mkString("\n")
-      findView(TR.alphabetText).setText(alphabetStr)
 
       for {
         word <- language.concept.wordsForLanguage(language).headOption
         text <- word.text.get(preferredAlphabet)
       } {
         // TODO: Improve this UI and avoid hardcode strings
-        findView(TR.languageText).setText(s"Language: $text")
+        languageText = s"Language: $text"
       }
 
       val synonyms = word.synonyms.flatMap(_.text.get(preferredAlphabet)).mkString(", ")
       if (synonyms.nonEmpty) {
         // TODO: Improve this UI and avoid hardcode strings
-        findView(TR.synonymsText).setText(s"Synonyms: $synonyms")
+        synonymsText = s"Synonyms: $synonyms"
       }
 
       val translations = word.translations.flatMap(w => w.text.get(w.language.preferredAlphabet)).mkString(", ")
       if (translations.nonEmpty) {
         // TODO: Improve this UI and avoid hardcode strings
-        findView(TR.translationsText).setText(s"Translations: $translations")
+        translationsText =  s"Translations: $translations"
       }
     }
+
+    findView(TR.recyclerView).setAdapter(new WordDetailsAdapter(alphabetText, languageText, synonymsText, translationsText))
   }
 
   def updateMenu(menu :Menu) = {
