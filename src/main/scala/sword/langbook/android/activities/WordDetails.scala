@@ -76,7 +76,8 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
       translations = word.translations.toVector
     }
 
-    findView(TR.recyclerView).setAdapter(new WordDetailsAdapter(alphabetStrings, languageText, synonyms, translations))
+    findView(TR.recyclerView).setAdapter(new WordDetailsAdapter(this, alphabetStrings,
+        languageText, synonyms, translations))
   }
 
   def updateMenu(menu :Menu) = {

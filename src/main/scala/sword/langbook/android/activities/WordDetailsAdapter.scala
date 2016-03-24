@@ -1,10 +1,11 @@
 package sword.langbook.android.activities
 
+import android.app.Activity
 import android.support.v7.widget.RecyclerView
-import android.view.ViewGroup
+import android.view.{View, ViewGroup}
 import sword.langbook.db.Word
 
-case class WordDetailsAdapter(alphabets: IndexedSeq[String], language: String,
+case class WordDetailsAdapter(activity: Activity, alphabets: IndexedSeq[String], language: String,
     synonyms: IndexedSeq[Word], translations: IndexedSeq[Word])
     extends RecyclerView.Adapter[WordDetailsViewHolder] {
 
@@ -79,13 +80,29 @@ case class WordDetailsAdapter(alphabets: IndexedSeq[String], language: String,
         val relPosition = position - currentHeaderPosition - 1
 
         val text = currentSection match {
-          case sectionTitles.alphabets => alphabets(relPosition)
-          case sectionTitles.language => language
+          case sectionTitles.alphabets =>
+            holder.linearLayout.setClickable(false)
+            alphabets(relPosition)
+          case sectionTitles.language =>
+            holder.linearLayout.setClickable(false)
+            language
           case sectionTitles.synonyms =>
             val synonym = synonyms(relPosition)
+            holder.linearLayout.setClickable(true)
+            holder.linearLayout.setOnClickListener(new View.OnClickListener() {
+              override def onClick(v: View): Unit = {
+                WordDetails.openWith(activity, RequestCodes.checkWordDetails, synonym)
+              }
+            })
             synonym.text(synonym.language.preferredAlphabet)
           case sectionTitles.translations =>
             val translation = translations(relPosition)
+            holder.linearLayout.setClickable(true)
+            holder.linearLayout.setOnClickListener(new View.OnClickListener() {
+              override def onClick(v: View): Unit = {
+                WordDetails.openWith(activity, RequestCodes.checkWordDetails, translation)
+              }
+            })
             translation.text(translation.language.preferredAlphabet)
         }
 
