@@ -7,20 +7,34 @@ case class WordDetailsAdapter(alphabets: String, language: String, synonyms: Str
 
   // TODO: This should not be using 4 strings, but a dynamical growing structure
 
-  override val getItemCount = 4
+  val sectionTitles = List("Alphabets", "Language", "Synonyms", "Translations")
+
+  val sectionPositions = Map(0 -> 0, 2 -> 1, 4 -> 2, 6 -> 3)
+
+  override val getItemCount = 8
+
+  override def getItemViewType(position: Int) = position % 2
 
   override def onCreateViewHolder(viewGroup: ViewGroup, viewType: Int): WordDetailsViewHolder = {
-    WordDetailsViewHolder.newInstance(viewGroup)
+    viewType match {
+      case 0 => WordDetailsSectionHeaderViewHolder.newInstance(viewGroup)
+      case 1 => WordDetailsSectionEntryViewHolder.newInstance(viewGroup)
+    }
   }
 
   override def onBindViewHolder(vh: WordDetailsViewHolder, position: Int): Unit = {
-    val text = position match {
-      case 0 => alphabets
-      case 1 => language
-      case 2 => synonyms
-      case 3 => translations
-    }
+    vh match {
+      case holder: WordDetailsSectionHeaderViewHolder =>
+        holder.textView.setText(sectionTitles(sectionPositions(position)))
+      case holder: WordDetailsSectionEntryViewHolder =>
+        val text = position match {
+          case 1 => alphabets
+          case 3 => language
+          case 5 => synonyms
+          case 7 => translations
+        }
 
-    vh.textView.setText(text)
+        holder.textView.setText(text)
+    }
   }
 }
