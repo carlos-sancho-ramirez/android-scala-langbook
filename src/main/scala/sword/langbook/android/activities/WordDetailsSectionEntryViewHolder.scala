@@ -12,7 +12,7 @@ case class WordDetailsSectionEntryViewHolder(linearLayout: LinearLayout) extends
 object WordDetailsSectionEntryViewHolder {
   def newInstance(parent: ViewGroup) = {
     val inflater = LayoutInflater.from(parent.getContext)
-    val view = inflater.inflate(TR.layout.word_details_entry, parent, false)
+    val view = inflater.inflate(TR.layout.word_details_section_entry, parent, false)
     new WordDetailsSectionEntryViewHolder(view)
   }
 }
