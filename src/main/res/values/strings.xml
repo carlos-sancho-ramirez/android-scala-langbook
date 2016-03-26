@@ -3,10 +3,12 @@
     <!-- General -->
     <string name="appName">Langbook</string>
     <string name="languageSelectorTitle">Pick a language</string>
+    <string name="quizSelectorTitle">Pick a type of question</string>
 
     <!-- Main activity -->
     <string name="main">Langbook</string>
     <string name="checkWordsButton">Dictionary</string>
+    <string name="startQuizButton">Evaluate yourself</string>
 
     <!-- Word editor -->
     <string name="wordEditorFieldHint">Type the new word</string>

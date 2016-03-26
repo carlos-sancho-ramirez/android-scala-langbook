@@ -41,5 +41,8 @@
         <activity
             android:name=".activities.WordEditor"
             android:label="@string/appName"/>
+
+        <activity
+            android:name=".activities.QuizSelector"/>
     </application>
 </manifest>
