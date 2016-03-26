@@ -21,7 +21,7 @@
             android:label="@string/appName"/>
 
         <activity
-            android:name=".activities.Selector"
+            android:name=".activities.Main"
             android:label="@string/appName">
 
             <intent-filter>
@@ -29,6 +29,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".activities.Selector"
+            android:label="@string/appName"/>
 
         <activity
             android:name=".activities.WordDetails"
