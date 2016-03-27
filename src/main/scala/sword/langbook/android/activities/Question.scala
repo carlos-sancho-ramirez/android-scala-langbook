@@ -30,9 +30,6 @@ class Question extends BaseActivity with View.OnClickListener {
 
   lazy val question = {
     val encoded = getIntent.getStringExtra(BundleKeys.question)
-    Log.i("Question", "==================================================================")
-    Log.i("Question", s"Decoding question: $encoded")
-    Log.i("Question", "==================================================================")
     sword.langbook.Question.decode(linkedDb, encoded).get
   }
 

@@ -68,6 +68,11 @@ class QuizSelector extends BaseActivity with AdapterView.OnItemClickListener {
         val targets = linkedDb.alphabets.values.find(_.concept.hint == SQLiteStorageManager.kanjiAlphabetHint).toSet
         val questionOption = InterAlphabetQuestion.newAleatoryQuestion(linkedDb, sources, targets)
         questionOption.foreach(question => Question.openWith(this, question))
+      case quizTypes.interAlphabetKanjiKana =>
+        val sources = linkedDb.alphabets.values.find(_.concept.hint == SQLiteStorageManager.kanjiAlphabetHint).toSet
+        val targets = linkedDb.alphabets.values.find(_.concept.hint == SQLiteStorageManager.kanaAlphabetHint).toSet
+        val questionOption = InterAlphabetQuestion.newAleatoryQuestion(linkedDb, sources, targets)
+        questionOption.foreach(question => Question.openWith(this, question))
       case _ =>
         Toast.makeText(this, s"Clicked on ${quizNames(position)}", Toast.LENGTH_SHORT).show()
     }
