@@ -24,6 +24,8 @@ object QuizSelector {
 
 class QuizSelector extends BaseActivity with AdapterView.OnItemClickListener {
 
+  // This list should be dynamic and appear more or less depending on the current database
+  // TODO: Make this list dynamic and stop referencing concrete alphabets
   object quizTypes {
     val interAlphabetKanaKanji = "inter-alphabet (kana -> kanji)"
     val interAlphabetKanjiKana = "inter-alphabet (kanji -> kana)"
@@ -65,6 +67,18 @@ class QuizSelector extends BaseActivity with AdapterView.OnItemClickListener {
     listView.setAdapter(new Adapter())
   }
 
+  private def openSynonymQuestion(alphabetHint: String): Unit = {
+    val alphabetOption = linkedDb.alphabets.values.find(_.concept.hint == alphabetHint)
+    val questionOption = alphabetOption.flatMap(alphabet => SynonymQuestion.newAleatoryQuestion(linkedDb, alphabet))
+
+    if (questionOption.isDefined) {
+      questionOption.foreach(question => Question.openWith(this, question))
+    }
+    else {
+      Toast.makeText(this, s"No question can be created for the current database", Toast.LENGTH_SHORT).show()
+    }
+  }
+
   override def onItemClick(parent: AdapterView[_], view: View, position: Int, id: Long): Unit = {
     quizNames(position) match {
       case quizTypes.interAlphabetKanaKanji =>
@@ -78,15 +92,13 @@ class QuizSelector extends BaseActivity with AdapterView.OnItemClickListener {
         val questionOption = InterAlphabetQuestion.newAleatoryQuestion(linkedDb, sources, targets)
         questionOption.foreach(question => Question.openWith(this, question))
       case quizTypes.synonymEnglish =>
-        val alphabetOption = linkedDb.alphabets.values.find(_.concept.hint == SQLiteStorageManager.englishAlphabetHint)
-        val questionOption = alphabetOption.flatMap(alphabet => SynonymQuestion.newAleatoryQuestion(linkedDb, alphabet))
-
-        if (questionOption.isDefined) {
-          questionOption.foreach(question => Question.openWith(this, question))
-        }
-        else {
-          Toast.makeText(this, s"No question can be created for the current database", Toast.LENGTH_SHORT).show()
-        }
+        openSynonymQuestion(SQLiteStorageManager.englishAlphabetHint)
+      case quizTypes.synonymSpanish =>
+        openSynonymQuestion(SQLiteStorageManager.spanishAlphabetHint)
+      case quizTypes.synonymKana =>
+        openSynonymQuestion(SQLiteStorageManager.kanaAlphabetHint)
+      case quizTypes.synonymKanji =>
+        openSynonymQuestion(SQLiteStorageManager.kanjiAlphabetHint)
       case _ =>
         Toast.makeText(this, s"Clicked on ${quizNames(position)}", Toast.LENGTH_SHORT).show()
     }
