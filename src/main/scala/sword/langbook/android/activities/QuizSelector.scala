@@ -5,7 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.{LayoutInflater, ViewGroup, View}
 import android.widget.{Toast, AdapterView, BaseAdapter}
-import sword.langbook.{SynonymQuestion, InterAlphabetQuestion}
+import sword.langbook.{TranslationQuestion, SynonymQuestion, InterAlphabetQuestion}
 import sword.langbook.android.db.SQLiteStorageManager
 import sword.langbook.android.{TR, R}
 import sword.langbook.android.TypedResource._
@@ -33,12 +33,19 @@ class QuizSelector extends BaseActivity with AdapterView.OnItemClickListener {
     val synonymSpanish = "Spanish synonym"
     val synonymKana = "Japanese Kana synonym"
     val synonymKanji = "Japanese Kanji synonym"
-    val translation = "translation"
+    val translationEnSp = "translation (English -> Spanish)"
+    val translationSpEn = "translation (Spanish -> English)"
+    val translationEnJp = "translation (English -> Japanese)"
+    val translationJpEn = "translation (Japanese -> English)"
+    val translationJpSp = "translation (Japanese -> Spanish)"
+    val translationSpJp = "translation (Spanish -> Japanese)"
   }
 
   val quizNames = Vector(quizTypes.interAlphabetKanaKanji, quizTypes.interAlphabetKanjiKana,
     quizTypes.synonymEnglish, quizTypes.synonymSpanish, quizTypes.synonymKana,
-    quizTypes.synonymKanji, quizTypes.translation)
+    quizTypes.synonymKanji, quizTypes.translationEnSp, quizTypes.translationSpEn,
+    quizTypes.translationEnJp, quizTypes.translationJpEn, quizTypes.translationJpSp,
+    quizTypes.translationSpJp)
 
   class Adapter extends BaseAdapter {
 
@@ -99,6 +106,20 @@ class QuizSelector extends BaseActivity with AdapterView.OnItemClickListener {
         openSynonymQuestion(SQLiteStorageManager.kanaAlphabetHint)
       case quizTypes.synonymKanji =>
         openSynonymQuestion(SQLiteStorageManager.kanjiAlphabetHint)
+      case quizTypes.translationEnSp =>
+        val questionOption = for {
+          sourceLanguage <- linkedDb.languages.values
+            .find(_.concept.hint == SQLiteStorageManager.englishLanguageHint)
+          targetLanguage <- linkedDb.languages.values
+            .find(_.concept.hint == SQLiteStorageManager.spanishLanguageHint)
+          question <- TranslationQuestion.newAleatoryQuestion(linkedDb, sourceLanguage,
+            targetLanguage, sourceLanguage.alphabets.toSet, targetLanguage.alphabets.toSet)
+        } yield {
+          question
+        }
+
+        if (questionOption.isDefined) Question.openWith(this, questionOption.get)
+        else Toast.makeText(this, s"No question can be created for the current database", Toast.LENGTH_SHORT).show()
       case _ =>
         Toast.makeText(this, s"Clicked on ${quizNames(position)}", Toast.LENGTH_SHORT).show()
     }

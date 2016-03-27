@@ -21,6 +21,13 @@ object SQLiteStorageManager {
   val kanjiAlphabetHint = "Kanji alphabet"
   val englishAlphabetHint = "English alphabet"
   val spanishAlphabetHint = "Spanish alphabet"
+
+  // This is required in order that app can identify languages.
+  // This is only used for quizzes right now, so it should not be required if the app was generic enough.
+  // TODO: Remove this hints when the app do not require them
+  val englishLanguageHint = "English"
+  val spanishLanguageHint = "Spanish"
+  val japaneseLanguageHint = "Japanese"
 }
 
 class SQLiteStorageManager(context :Context, dbName: String, override val registerDefinitions :Seq[RegisterDefinition])
@@ -147,9 +154,9 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val kanaAlphabetConceptKey = insertConcept(SQLiteStorageManager.kanaAlphabetHint).get
     val kanaAlphabetKey = insert(db, registers.Alphabet(kanaAlphabetConceptKey)).get
 
-    val englishConceptKey = insertConcept("English").get
-    val spanishConceptKey = insertConcept("Spanish").get
-    val japaneseConceptKey = insertConcept("Japanese").get
+    val englishConceptKey = insertConcept(SQLiteStorageManager.englishLanguageHint).get
+    val spanishConceptKey = insertConcept(SQLiteStorageManager.spanishLanguageHint).get
+    val japaneseConceptKey = insertConcept(SQLiteStorageManager.japaneseLanguageHint).get
 
     val englishKey = insert(db, registers.Language(englishConceptKey, enAlphabetKey)).get
     val spanishKey = insert(db, registers.Language(spanishConceptKey, spAlphabetKey)).get
