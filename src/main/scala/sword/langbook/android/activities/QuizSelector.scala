@@ -5,7 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.{LayoutInflater, ViewGroup, View}
 import android.widget.{Toast, AdapterView, BaseAdapter}
-import sword.langbook.InterAlphabetQuestion
+import sword.langbook.{SynonymQuestion, InterAlphabetQuestion}
 import sword.langbook.android.db.SQLiteStorageManager
 import sword.langbook.android.{TR, R}
 import sword.langbook.android.TypedResource._
@@ -27,12 +27,16 @@ class QuizSelector extends BaseActivity with AdapterView.OnItemClickListener {
   object quizTypes {
     val interAlphabetKanaKanji = "inter-alphabet (kana -> kanji)"
     val interAlphabetKanjiKana = "inter-alphabet (kanji -> kana)"
-    val synonym = "synonym"
+    val synonymEnglish = "English synonym"
+    val synonymSpanish = "Spanish synonym"
+    val synonymKana = "Japanese Kana synonym"
+    val synonymKanji = "Japanese Kanji synonym"
     val translation = "translation"
   }
 
   val quizNames = Vector(quizTypes.interAlphabetKanaKanji, quizTypes.interAlphabetKanjiKana,
-    quizTypes.synonym, quizTypes.translation)
+    quizTypes.synonymEnglish, quizTypes.synonymSpanish, quizTypes.synonymKana,
+    quizTypes.synonymKanji, quizTypes.translation)
 
   class Adapter extends BaseAdapter {
 
@@ -73,6 +77,16 @@ class QuizSelector extends BaseActivity with AdapterView.OnItemClickListener {
         val targets = linkedDb.alphabets.values.find(_.concept.hint == SQLiteStorageManager.kanaAlphabetHint).toSet
         val questionOption = InterAlphabetQuestion.newAleatoryQuestion(linkedDb, sources, targets)
         questionOption.foreach(question => Question.openWith(this, question))
+      case quizTypes.synonymEnglish =>
+        val alphabetOption = linkedDb.alphabets.values.find(_.concept.hint == SQLiteStorageManager.englishAlphabetHint)
+        val questionOption = alphabetOption.flatMap(alphabet => SynonymQuestion.newAleatoryQuestion(linkedDb, alphabet))
+
+        if (questionOption.isDefined) {
+          questionOption.foreach(question => Question.openWith(this, question))
+        }
+        else {
+          Toast.makeText(this, s"No question can be created for the current database", Toast.LENGTH_SHORT).show()
+        }
       case _ =>
         Toast.makeText(this, s"Clicked on ${quizNames(position)}", Toast.LENGTH_SHORT).show()
     }
