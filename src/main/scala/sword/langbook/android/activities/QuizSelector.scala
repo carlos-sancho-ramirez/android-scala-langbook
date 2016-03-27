@@ -33,12 +33,12 @@ class QuizSelector extends BaseActivity with AdapterView.OnItemClickListener {
     val synonymSpanish = "Spanish synonym"
     val synonymKana = "Japanese Kana synonym"
     val synonymKanji = "Japanese Kanji synonym"
-    val translationEnSp = "translation (English -> Spanish)"
-    val translationSpEn = "translation (Spanish -> English)"
-    val translationEnJp = "translation (English -> Japanese)"
-    val translationJpEn = "translation (Japanese -> English)"
-    val translationJpSp = "translation (Japanese -> Spanish)"
-    val translationSpJp = "translation (Spanish -> Japanese)"
+    val translationEnSp = "Translation (English -> Spanish)"
+    val translationSpEn = "Translation (Spanish -> English)"
+    val translationEnJp = "Translation (English -> Japanese)"
+    val translationJpEn = "Translation (Japanese -> English)"
+    val translationJpSp = "Translation (Japanese -> Spanish)"
+    val translationSpJp = "Translation (Spanish -> Japanese)"
   }
 
   val quizNames = Vector(quizTypes.interAlphabetKanaKanji, quizTypes.interAlphabetKanjiKana,
@@ -86,6 +86,22 @@ class QuizSelector extends BaseActivity with AdapterView.OnItemClickListener {
     }
   }
 
+  private def openTranslationQuestion(sourceLanguageHint: String, targetLanguageHint: String) = {
+    val questionOption = for {
+      sourceLanguage <- linkedDb.languages.values
+        .find(_.concept.hint == sourceLanguageHint)
+      targetLanguage <- linkedDb.languages.values
+        .find(_.concept.hint == targetLanguageHint)
+      question <- TranslationQuestion.newAleatoryQuestion(linkedDb, sourceLanguage,
+        targetLanguage, sourceLanguage.alphabets.toSet, targetLanguage.alphabets.toSet)
+    } yield {
+      question
+    }
+
+    if (questionOption.isDefined) Question.openWith(this, questionOption.get)
+    else Toast.makeText(this, s"No question can be created for the current database", Toast.LENGTH_SHORT).show()
+  }
+
   override def onItemClick(parent: AdapterView[_], view: View, position: Int, id: Long): Unit = {
     quizNames(position) match {
       case quizTypes.interAlphabetKanaKanji =>
@@ -107,19 +123,17 @@ class QuizSelector extends BaseActivity with AdapterView.OnItemClickListener {
       case quizTypes.synonymKanji =>
         openSynonymQuestion(SQLiteStorageManager.kanjiAlphabetHint)
       case quizTypes.translationEnSp =>
-        val questionOption = for {
-          sourceLanguage <- linkedDb.languages.values
-            .find(_.concept.hint == SQLiteStorageManager.englishLanguageHint)
-          targetLanguage <- linkedDb.languages.values
-            .find(_.concept.hint == SQLiteStorageManager.spanishLanguageHint)
-          question <- TranslationQuestion.newAleatoryQuestion(linkedDb, sourceLanguage,
-            targetLanguage, sourceLanguage.alphabets.toSet, targetLanguage.alphabets.toSet)
-        } yield {
-          question
-        }
-
-        if (questionOption.isDefined) Question.openWith(this, questionOption.get)
-        else Toast.makeText(this, s"No question can be created for the current database", Toast.LENGTH_SHORT).show()
+        openTranslationQuestion(SQLiteStorageManager.englishLanguageHint, SQLiteStorageManager.spanishLanguageHint)
+      case quizTypes.translationEnJp =>
+        openTranslationQuestion(SQLiteStorageManager.englishLanguageHint, SQLiteStorageManager.japaneseLanguageHint)
+      case quizTypes.translationSpEn =>
+        openTranslationQuestion(SQLiteStorageManager.spanishLanguageHint, SQLiteStorageManager.englishLanguageHint)
+      case quizTypes.translationSpJp =>
+        openTranslationQuestion(SQLiteStorageManager.spanishLanguageHint, SQLiteStorageManager.japaneseLanguageHint)
+      case quizTypes.translationJpEn =>
+        openTranslationQuestion(SQLiteStorageManager.japaneseLanguageHint, SQLiteStorageManager.englishLanguageHint)
+      case quizTypes.translationJpSp =>
+        openTranslationQuestion(SQLiteStorageManager.japaneseLanguageHint, SQLiteStorageManager.spanishLanguageHint)
       case _ =>
         Toast.makeText(this, s"Clicked on ${quizNames(position)}", Toast.LENGTH_SHORT).show()
     }
