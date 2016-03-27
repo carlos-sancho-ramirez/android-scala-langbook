@@ -11,9 +11,9 @@
         android:orientation="vertical"/>
 
     <Button
-        android:id="@+id/saveButton"
+        android:id="@+id/checkAnswerButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/wordEditorSaveButton"/>
+        android:text="@string/checkAnswerButton"/>
 
 </LinearLayout>

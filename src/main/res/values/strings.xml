@@ -14,6 +14,9 @@
     <string name="wordEditorFieldHint">Type the new word</string>
     <string name="wordEditorSaveButton">Save</string>
 
+    <!-- Questions -->
+    <string name="checkAnswerButton">Check answer</string>
+
     <!-- Menu options -->
     <string name="newLanguageOption">New language</string>
     <string name="newSynonymOption">New synonym</string>

@@ -83,6 +83,7 @@ class WordEditor extends BaseActivity with View.OnClickListener {
       for {
         languageKey <- langKeyOpt
         alphabet <- Language(languageKey).alphabets
+        // TODO: Simplify the way to retrieve a word for and Alphabet for a given language
         alphabetWord <- alphabet.concept.words.headOption
         alphabetText <- alphabetWord.text.get(Language(languageKey).preferredAlphabet)
       } {

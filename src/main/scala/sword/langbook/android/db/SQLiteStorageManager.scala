@@ -13,6 +13,12 @@ object SQLiteStorageManager {
   val currentDbVersion = 4
   val idKey = "id"
   val collKey = "coll"
+
+  // This is required in order that app can know which alfabet is the kana, and which one the Kanji.
+  // This should not be required if the app was generic enough.
+  // TODO: Remove this hints when the app do not require them
+  val kanaAlphabetHint = "Kana alphabet"
+  val kanjiAlphabetHint = "Kanji alphabet"
 }
 
 class SQLiteStorageManager(context :Context, dbName: String, override val registerDefinitions :Seq[RegisterDefinition])
@@ -134,9 +140,9 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val spAlphabetConceptKey = insertConcept("Spanish alphabet").get
     val spAlphabetKey = insert(db, registers.Alphabet(spAlphabetConceptKey)).get
 
-    val kanjiAlphabetConceptKey = insertConcept("Kanji alphabet").get
+    val kanjiAlphabetConceptKey = insertConcept(SQLiteStorageManager.kanjiAlphabetHint).get
     val kanjiAlphabetKey = insert(db, registers.Alphabet(kanjiAlphabetConceptKey)).get
-    val kanaAlphabetConceptKey = insertConcept("Kana alphabet").get
+    val kanaAlphabetConceptKey = insertConcept(SQLiteStorageManager.kanaAlphabetHint).get
     val kanaAlphabetKey = insert(db, registers.Alphabet(kanaAlphabetConceptKey)).get
 
     val englishConceptKey = insertConcept("English").get

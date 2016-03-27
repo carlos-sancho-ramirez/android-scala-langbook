@@ -5,6 +5,8 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.{LayoutInflater, ViewGroup, View}
 import android.widget.{Toast, AdapterView, BaseAdapter}
+import sword.langbook.InterAlphabetQuestion
+import sword.langbook.android.db.SQLiteStorageManager
 import sword.langbook.android.{TR, R}
 import sword.langbook.android.TypedResource._
 
@@ -22,7 +24,15 @@ object QuizSelector {
 
 class QuizSelector extends BaseActivity with AdapterView.OnItemClickListener {
 
-  val quizNames = Vector("inter-alphabet", "synonym", "translation")
+  object quizTypes {
+    val interAlphabetKanaKanji = "inter-alphabet (kana -> kanji)"
+    val interAlphabetKanjiKana = "inter-alphabet (kanji -> kana)"
+    val synonym = "synonym"
+    val translation = "translation"
+  }
+
+  val quizNames = Vector(quizTypes.interAlphabetKanaKanji, quizTypes.interAlphabetKanjiKana,
+    quizTypes.synonym, quizTypes.translation)
 
   class Adapter extends BaseAdapter {
 
@@ -52,6 +62,14 @@ class QuizSelector extends BaseActivity with AdapterView.OnItemClickListener {
   }
 
   override def onItemClick(parent: AdapterView[_], view: View, position: Int, id: Long): Unit = {
-    Toast.makeText(this, s"Clicked on ${quizNames(position)}", Toast.LENGTH_SHORT).show()
+    quizNames(position) match {
+      case quizTypes.interAlphabetKanaKanji =>
+        val sources = linkedDb.alphabets.values.find(_.concept.hint == SQLiteStorageManager.kanaAlphabetHint).toSet
+        val targets = linkedDb.alphabets.values.find(_.concept.hint == SQLiteStorageManager.kanjiAlphabetHint).toSet
+        val questionOption = InterAlphabetQuestion.newAleatoryQuestion(linkedDb, sources, targets)
+        questionOption.foreach(question => Question.openWith(this, question))
+      case _ =>
+        Toast.makeText(this, s"Clicked on ${quizNames(position)}", Toast.LENGTH_SHORT).show()
+    }
   }
 }
