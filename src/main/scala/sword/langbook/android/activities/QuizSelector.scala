@@ -25,11 +25,19 @@ object QuizSelector {
 
 class QuizSelector extends BaseActivity with AdapterView.OnItemClickListener {
 
+  lazy val possibleInterAlphabetQuestions = InterAlphabetQuestion.findPossibleQuestionTypes(linkedDb).toList
+  def interAlphabetQuestionNames = for {
+    (sources, targets) <- possibleInterAlphabetQuestions
+  } yield {
+    // TODO: Improve way to retrieve a suitable text to name an alphabet
+    val sourceText = sources.flatMap(source => source.concept.words.headOption.flatMap(w => w.text.get(w.language.preferredAlphabet))).mkString(", ")
+    val targetText = targets.flatMap(target => target.concept.words.headOption.flatMap(w => w.text.get(w.language.preferredAlphabet))).mkString(", ")
+    s"Inter-alphabet from $sourceText to $targetText"
+  }
+
   // This list should be dynamic and appear more or less depending on the current database
   // TODO: Make this list dynamic and stop referencing concrete alphabets
   object quizTypes {
-    val interAlphabetKanaKanji = "inter-alphabet (kana -> kanji)"
-    val interAlphabetKanjiKana = "inter-alphabet (kanji -> kana)"
     val synonymEnglish = "English synonym"
     val synonymSpanish = "Spanish synonym"
     val synonymKana = "Japanese Kana synonym"
@@ -42,7 +50,7 @@ class QuizSelector extends BaseActivity with AdapterView.OnItemClickListener {
     val translationSpJp = "Translation (Spanish -> Japanese)"
   }
 
-  val quizNames = Vector(quizTypes.interAlphabetKanaKanji, quizTypes.interAlphabetKanjiKana,
+  lazy val quizNames = interAlphabetQuestionNames.toVector ++ Vector(
     quizTypes.synonymEnglish, quizTypes.synonymSpanish, quizTypes.synonymKana,
     quizTypes.synonymKanji, quizTypes.translationEnSp, quizTypes.translationSpEn,
     quizTypes.translationEnJp, quizTypes.translationJpEn, quizTypes.translationJpSp,
@@ -102,39 +110,42 @@ class QuizSelector extends BaseActivity with AdapterView.OnItemClickListener {
   }
 
   override def onItemClick(parent: AdapterView[_], view: View, position: Int, id: Long): Unit = {
-    quizNames(position) match {
-      case quizTypes.interAlphabetKanaKanji =>
-        val sources = linkedDb.alphabets.values.find(_.concept.hint == SQLiteStorageManager.kanaAlphabetHint).toSet
-        val targets = linkedDb.alphabets.values.find(_.concept.hint == SQLiteStorageManager.kanjiAlphabetHint).toSet
-        val questionOption = InterAlphabetQuestion.newAleatoryQuestion(linkedDb, sources, targets)
-        questionOption.foreach(question => Question.openWith(this, question))
-      case quizTypes.interAlphabetKanjiKana =>
-        val sources = linkedDb.alphabets.values.find(_.concept.hint == SQLiteStorageManager.kanjiAlphabetHint).toSet
-        val targets = linkedDb.alphabets.values.find(_.concept.hint == SQLiteStorageManager.kanaAlphabetHint).toSet
-        val questionOption = InterAlphabetQuestion.newAleatoryQuestion(linkedDb, sources, targets)
-        questionOption.foreach(question => Question.openWith(this, question))
-      case quizTypes.synonymEnglish =>
-        openSynonymQuestion(SQLiteStorageManager.englishAlphabetHint)
-      case quizTypes.synonymSpanish =>
-        openSynonymQuestion(SQLiteStorageManager.spanishAlphabetHint)
-      case quizTypes.synonymKana =>
-        openSynonymQuestion(SQLiteStorageManager.kanaAlphabetHint)
-      case quizTypes.synonymKanji =>
-        openSynonymQuestion(SQLiteStorageManager.kanjiAlphabetHint)
-      case quizTypes.translationEnSp =>
-        openTranslationQuestion(SQLiteStorageManager.englishCode, SQLiteStorageManager.spanishCode)
-      case quizTypes.translationEnJp =>
-        openTranslationQuestion(SQLiteStorageManager.englishCode, SQLiteStorageManager.japaneseCode)
-      case quizTypes.translationSpEn =>
-        openTranslationQuestion(SQLiteStorageManager.spanishCode, SQLiteStorageManager.englishCode)
-      case quizTypes.translationSpJp =>
-        openTranslationQuestion(SQLiteStorageManager.spanishCode, SQLiteStorageManager.japaneseCode)
-      case quizTypes.translationJpEn =>
-        openTranslationQuestion(SQLiteStorageManager.japaneseCode, SQLiteStorageManager.englishCode)
-      case quizTypes.translationJpSp =>
-        openTranslationQuestion(SQLiteStorageManager.japaneseCode, SQLiteStorageManager.spanishCode)
-      case _ =>
-        Toast.makeText(this, s"Clicked on ${quizNames(position)}", Toast.LENGTH_SHORT).show()
+    if (position < possibleInterAlphabetQuestions.size) {
+      val (sources, targets) = possibleInterAlphabetQuestions(position)
+      val questionOption = InterAlphabetQuestion.newAleatoryQuestion(linkedDb, sources, targets)
+      questionOption.foreach(question => Question.openWith(this, question))
+    }
+    else {
+      quizNames(position) match {
+        case quizTypes.synonymEnglish =>
+          openSynonymQuestion(SQLiteStorageManager.englishAlphabetHint)
+        case quizTypes.synonymSpanish =>
+          openSynonymQuestion(SQLiteStorageManager.spanishAlphabetHint)
+        case quizTypes.synonymKana =>
+          openSynonymQuestion(SQLiteStorageManager.kanaAlphabetHint)
+        case quizTypes.synonymKanji =>
+          openSynonymQuestion(SQLiteStorageManager.kanjiAlphabetHint)
+        case quizTypes.translationEnSp =>
+          openTranslationQuestion(SQLiteStorageManager.englishCode,
+            SQLiteStorageManager.spanishCode)
+        case quizTypes.translationEnJp =>
+          openTranslationQuestion(SQLiteStorageManager.englishCode,
+            SQLiteStorageManager.japaneseCode)
+        case quizTypes.translationSpEn =>
+          openTranslationQuestion(SQLiteStorageManager.spanishCode,
+            SQLiteStorageManager.englishCode)
+        case quizTypes.translationSpJp =>
+          openTranslationQuestion(SQLiteStorageManager.spanishCode,
+            SQLiteStorageManager.japaneseCode)
+        case quizTypes.translationJpEn =>
+          openTranslationQuestion(SQLiteStorageManager.japaneseCode,
+            SQLiteStorageManager.englishCode)
+        case quizTypes.translationJpSp =>
+          openTranslationQuestion(SQLiteStorageManager.japaneseCode,
+            SQLiteStorageManager.spanishCode)
+        case _ =>
+          Toast.makeText(this, s"Clicked on ${quizNames(position)}", Toast.LENGTH_SHORT).show()
+      }
     }
   }
 }
