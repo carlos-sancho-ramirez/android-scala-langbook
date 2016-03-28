@@ -78,7 +78,8 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
       val idKey = SQLiteStorageManager.idKey
       val fields = regDef.fields.map { fieldDef =>
         val sqlType = fieldDef match {
-          case _: CharSequenceField => "TEXT"
+          case CharSequenceFieldDefinition => "TEXT"
+          case LanguageCodeFieldDefinition => "TEXT"
           case _ => "INTEGER"
         }
 
@@ -158,9 +159,9 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val spanishConceptKey = insertConcept(SQLiteStorageManager.spanishLanguageHint).get
     val japaneseConceptKey = insertConcept(SQLiteStorageManager.japaneseLanguageHint).get
 
-    val englishKey = insert(db, registers.Language(englishConceptKey, enAlphabetKey)).get
-    val spanishKey = insert(db, registers.Language(spanishConceptKey, spAlphabetKey)).get
-    val japaneseKey = insert(db, registers.Language(japaneseConceptKey, kanjiAlphabetKey)).get
+    val englishKey = insert(db, registers.Language(englishConceptKey, "en", enAlphabetKey)).get
+    val spanishKey = insert(db, registers.Language(spanishConceptKey, "es", spAlphabetKey)).get
+    val japaneseKey = insert(db, registers.Language(japaneseConceptKey, "ja", kanjiAlphabetKey)).get
 
     val englishEnSymbolArrayCollection = insert(db, englishEnText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
     val englishSpSymbolArrayCollection = insert(db, englishSpText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
@@ -302,6 +303,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
       val value = cursor.getString(cursor.getColumnIndex(fieldName(regDef, fieldDef)))
       fieldDef match {
         case UnicodeFieldDefinition => UnicodeField(value.toInt)
+        case LanguageCodeFieldDefinition => LanguageCodeField(value)
         case CharSequenceFieldDefinition => CharSequenceField(value)
         case f:ForeignKeyFieldDefinition => new ForeignKeyField {
           override val key = obtainKey(f.target, 0, value.toInt)
@@ -353,10 +355,11 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     */
   private def sqlValue(field :Field) :String = {
     field match {
-      case f:UnicodeField => f.value.toString
-      case f:CharSequenceField => s"'${f.value}'"
-      case f:ForeignKeyField => f.key.index.toString
-      case f:CollectionReferenceField => f.collectionId.toString
+      case f: UnicodeField => f.value.toString
+      case f: LanguageCodeField => s"'${f.code.toString}'"
+      case f: CharSequenceField => s"'${f.value}'"
+      case f: ForeignKeyField => f.key.index.toString
+      case f: CollectionReferenceField => f.collectionId.toString
       case f => throw new UnsupportedOperationException(s"Undefined field definition $f")
     }
   }
