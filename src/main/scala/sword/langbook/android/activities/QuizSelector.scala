@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.{LayoutInflater, ViewGroup, View}
 import android.widget.{Toast, AdapterView, BaseAdapter}
+import sword.db.Register
 import sword.langbook.{TranslationQuestion, SynonymQuestion, InterAlphabetQuestion}
 import sword.langbook.android.db.SQLiteStorageManager
 import sword.langbook.android.{TR, R}
@@ -86,12 +87,10 @@ class QuizSelector extends BaseActivity with AdapterView.OnItemClickListener {
     }
   }
 
-  private def openTranslationQuestion(sourceLanguageHint: String, targetLanguageHint: String) = {
+  private def openTranslationQuestion(sourceLanguageCode: Register.LanguageCode, targetLanguageCode: Register.LanguageCode) = {
     val questionOption = for {
-      sourceLanguage <- linkedDb.languages.values
-        .find(_.concept.hint == sourceLanguageHint)
-      targetLanguage <- linkedDb.languages.values
-        .find(_.concept.hint == targetLanguageHint)
+      sourceLanguage <- linkedDb.languages.values.find(_.code == sourceLanguageCode)
+      targetLanguage <- linkedDb.languages.values.find(_.code == targetLanguageCode)
       question <- TranslationQuestion.newAleatoryQuestion(linkedDb, sourceLanguage,
         targetLanguage, sourceLanguage.alphabets.toSet, targetLanguage.alphabets.toSet)
     } yield {
@@ -123,17 +122,17 @@ class QuizSelector extends BaseActivity with AdapterView.OnItemClickListener {
       case quizTypes.synonymKanji =>
         openSynonymQuestion(SQLiteStorageManager.kanjiAlphabetHint)
       case quizTypes.translationEnSp =>
-        openTranslationQuestion(SQLiteStorageManager.englishLanguageHint, SQLiteStorageManager.spanishLanguageHint)
+        openTranslationQuestion(SQLiteStorageManager.englishCode, SQLiteStorageManager.spanishCode)
       case quizTypes.translationEnJp =>
-        openTranslationQuestion(SQLiteStorageManager.englishLanguageHint, SQLiteStorageManager.japaneseLanguageHint)
+        openTranslationQuestion(SQLiteStorageManager.englishCode, SQLiteStorageManager.japaneseCode)
       case quizTypes.translationSpEn =>
-        openTranslationQuestion(SQLiteStorageManager.spanishLanguageHint, SQLiteStorageManager.englishLanguageHint)
+        openTranslationQuestion(SQLiteStorageManager.spanishCode, SQLiteStorageManager.englishCode)
       case quizTypes.translationSpJp =>
-        openTranslationQuestion(SQLiteStorageManager.spanishLanguageHint, SQLiteStorageManager.japaneseLanguageHint)
+        openTranslationQuestion(SQLiteStorageManager.spanishCode, SQLiteStorageManager.japaneseCode)
       case quizTypes.translationJpEn =>
-        openTranslationQuestion(SQLiteStorageManager.japaneseLanguageHint, SQLiteStorageManager.englishLanguageHint)
+        openTranslationQuestion(SQLiteStorageManager.japaneseCode, SQLiteStorageManager.englishCode)
       case quizTypes.translationJpSp =>
-        openTranslationQuestion(SQLiteStorageManager.japaneseLanguageHint, SQLiteStorageManager.spanishLanguageHint)
+        openTranslationQuestion(SQLiteStorageManager.japaneseCode, SQLiteStorageManager.spanishCode)
       case _ =>
         Toast.makeText(this, s"Clicked on ${quizNames(position)}", Toast.LENGTH_SHORT).show()
     }

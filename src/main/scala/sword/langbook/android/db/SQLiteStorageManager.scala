@@ -22,12 +22,12 @@ object SQLiteStorageManager {
   val englishAlphabetHint = "English alphabet"
   val spanishAlphabetHint = "Spanish alphabet"
 
-  // This is required in order that app can identify languages.
-  // This is only used for quizzes right now, so it should not be required if the app was generic enough.
-  // TODO: Remove this hints when the app do not require them
-  val englishLanguageHint = "English"
-  val spanishLanguageHint = "Spanish"
-  val japaneseLanguageHint = "Japanese"
+  // This is required in order that app can identify languages when selecting quizzes.
+  // It should not be required if the app was generic enough.
+  // TODO: Remove these codes when the app does not require them
+  val englishCode = "en"
+  val spanishCode = "es"
+  val japaneseCode = "ja"
 }
 
 class SQLiteStorageManager(context :Context, dbName: String, override val registerDefinitions :Seq[RegisterDefinition])
@@ -155,13 +155,13 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val kanaAlphabetConceptKey = insertConcept(SQLiteStorageManager.kanaAlphabetHint).get
     val kanaAlphabetKey = insert(db, registers.Alphabet(kanaAlphabetConceptKey)).get
 
-    val englishConceptKey = insertConcept(SQLiteStorageManager.englishLanguageHint).get
-    val spanishConceptKey = insertConcept(SQLiteStorageManager.spanishLanguageHint).get
-    val japaneseConceptKey = insertConcept(SQLiteStorageManager.japaneseLanguageHint).get
+    val englishConceptKey = insertConcept("English").get
+    val spanishConceptKey = insertConcept("Spanish").get
+    val japaneseConceptKey = insertConcept("Japanese").get
 
-    val englishKey = insert(db, registers.Language(englishConceptKey, "en", enAlphabetKey)).get
-    val spanishKey = insert(db, registers.Language(spanishConceptKey, "es", spAlphabetKey)).get
-    val japaneseKey = insert(db, registers.Language(japaneseConceptKey, "ja", kanjiAlphabetKey)).get
+    val englishKey = insert(db, registers.Language(englishConceptKey, SQLiteStorageManager.englishCode, enAlphabetKey)).get
+    val spanishKey = insert(db, registers.Language(spanishConceptKey, SQLiteStorageManager.spanishCode, spAlphabetKey)).get
+    val japaneseKey = insert(db, registers.Language(japaneseConceptKey, SQLiteStorageManager.japaneseCode, kanjiAlphabetKey)).get
 
     val englishEnSymbolArrayCollection = insert(db, englishEnText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
     val englishSpSymbolArrayCollection = insert(db, englishSpText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
