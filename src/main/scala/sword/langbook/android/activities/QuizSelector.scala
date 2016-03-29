@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.view.{LayoutInflater, ViewGroup, View}
 import android.widget.{Toast, AdapterView, BaseAdapter}
 import sword.db.Register
+import sword.langbook.db.{Word, Alphabet}
 import sword.langbook.{TranslationQuestion, SynonymQuestion, InterAlphabetQuestion}
 import sword.langbook.android.db.SQLiteStorageManager
 import sword.langbook.android.{TR, R}
@@ -26,12 +27,21 @@ object QuizSelector {
 class QuizSelector extends BaseActivity with AdapterView.OnItemClickListener {
 
   lazy val possibleInterAlphabetQuestions = InterAlphabetQuestion.findPossibleQuestionTypes(linkedDb).toList
+
+  private def preferredAlphabetTitle(alphabet: Alphabet): Option[String] = {
+    val preferredWordOption = alphabet.concept.wordsForLanguage(preferredLanguage).headOption
+    val wordOption = {
+      if (preferredWordOption.isDefined) preferredWordOption
+      else alphabet.concept.words.headOption
+    }
+    wordOption.flatMap(w => w.text.get(w.language.preferredAlphabet))
+  }
+
   def interAlphabetQuestionNames = for {
     (sources, targets) <- possibleInterAlphabetQuestions
   } yield {
-    // TODO: Improve way to retrieve a suitable text to name an alphabet
-    val sourceText = sources.flatMap(source => source.concept.words.headOption.flatMap(w => w.text.get(w.language.preferredAlphabet))).mkString(", ")
-    val targetText = targets.flatMap(target => target.concept.words.headOption.flatMap(w => w.text.get(w.language.preferredAlphabet))).mkString(", ")
+    val sourceText = sources.flatMap(preferredAlphabetTitle).mkString(", ")
+    val targetText = targets.flatMap(preferredAlphabetTitle).mkString(", ")
     s"Inter-alphabet from $sourceText to $targetText"
   }
 
