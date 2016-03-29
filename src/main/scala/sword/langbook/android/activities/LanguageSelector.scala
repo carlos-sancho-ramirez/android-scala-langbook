@@ -41,12 +41,8 @@ class LanguageSelector extends BaseActivity with Toolbar.OnMenuItemClickListener
       val view = if (convertView != null) convertView
       else LayoutInflater.from(parent.getContext).inflate(R.layout.selector_entry, parent, false)
 
-      // Right now each language is displayed with its same language.
-      // But it would be valuable that the user could see the languages listed in its preferred language.
-      // However, when this code was written, there was no way to select the preferred language.
-      // TODO: Display the preferred language
       val language = items(position)
-      val text = language.concept.wordsForLanguage(language).headOption
+      val text = language.concept.wordsForLanguage(preferredLanguage).headOption
           .flatMap(w => w.text.get(w.language.preferredAlphabet)).getOrElse("")
       view.findView(TR.selectorEntryCaption).setText(text)
       view
