@@ -6,7 +6,7 @@ import android.os.Bundle
 import android.view.{LayoutInflater, ViewGroup, View}
 import android.widget.{Toast, AdapterView, BaseAdapter}
 import sword.db.Register
-import sword.langbook.db.{Word, Alphabet}
+import sword.langbook.db.{Language, Word, Alphabet}
 import sword.langbook.{TranslationQuestion, SynonymQuestion, InterAlphabetQuestion}
 import sword.langbook.android.db.SQLiteStorageManager
 import sword.langbook.android.{TR, R}
@@ -28,45 +28,47 @@ class QuizSelector extends BaseActivity with AdapterView.OnItemClickListener {
 
   lazy val possibleInterAlphabetQuestions = InterAlphabetQuestion.findPossibleQuestionTypes(linkedDb).toList
   lazy val possibleSynonymQuestions = SynonymQuestion.findPossibleQuestionTypes(linkedDb).toList
+  lazy val possibleTranslationQuestions = TranslationQuestion.findPossibleQuestionTypes(linkedDb).toList
 
-  private def preferredAlphabetTitle(alphabet: Alphabet): Option[String] = {
-    val preferredWordOption = alphabet.concept.wordsForLanguage(preferredLanguage).headOption
-    val wordOption = {
-      if (preferredWordOption.isDefined) preferredWordOption
-      else alphabet.concept.words.headOption
+  def interAlphabetQuestionNames = {
+    val prefLang = preferredLanguage
+    for {
+      (sources, targets) <- possibleInterAlphabetQuestions
+    } yield {
+      val sourceText = sources.flatMap(_.suitableTextForLanguage(prefLang)).mkString(", ")
+      val targetText = targets.flatMap(_.suitableTextForLanguage(prefLang)).mkString(", ")
+      s"Inter-alphabet from $sourceText to $targetText"
     }
-    wordOption.flatMap(w => w.text.get(w.language.preferredAlphabet))
-  }
-
-  def interAlphabetQuestionNames = for {
-    (sources, targets) <- possibleInterAlphabetQuestions
-  } yield {
-    val sourceText = sources.flatMap(preferredAlphabetTitle).mkString(", ")
-    val targetText = targets.flatMap(preferredAlphabetTitle).mkString(", ")
-    s"Inter-alphabet from $sourceText to $targetText"
   }
 
   def synonymQuestionNames = for {
     alphabet <- possibleSynonymQuestions
   } yield {
-    val text = preferredAlphabetTitle(alphabet).getOrElse("?")
+    val text = alphabet.suitableTextForLanguage(preferredLanguage).getOrElse("?")
     s"Synonym for $text alphabet"
   }
 
-  // This list should be dynamic and appear more or less depending on the current database
-  // TODO: Make this list dynamic and stop referencing concrete alphabets
-  object quizTypes {
-    val translationEnSp = "Translation (English -> Spanish)"
-    val translationSpEn = "Translation (Spanish -> English)"
-    val translationEnJp = "Translation (English -> Japanese)"
-    val translationJpEn = "Translation (Japanese -> English)"
-    val translationJpSp = "Translation (Japanese -> Spanish)"
-    val translationSpJp = "Translation (Spanish -> Japanese)"
+  private def translationQuestionAlphabetName(language: Language, alphabets: Set[Alphabet]) = {
+    val languageText = language.suitableTextForLanguage(preferredLanguage).getOrElse("?")
+    if (language.alphabets.size != 1) {
+      val subText = alphabets.flatMap(_.suitableTextForLanguage(preferredLanguage)).mkString(", ")
+      s"$languageText ($subText)"
+    }
+    else languageText
   }
 
-  lazy val quizNames = interAlphabetQuestionNames.toVector ++ synonymQuestionNames.toVector ++ Vector(
-    quizTypes.translationEnSp, quizTypes.translationSpEn, quizTypes.translationEnJp,
-    quizTypes.translationJpEn, quizTypes.translationJpSp, quizTypes.translationSpJp)
+  def translationQuestionNames = for {
+    (sourceLanguage, targetLanguage, sourceAlphabets, targetAlphabets) <- possibleTranslationQuestions
+  } yield {
+    val source = translationQuestionAlphabetName(sourceLanguage, sourceAlphabets)
+    val target = translationQuestionAlphabetName(targetLanguage, targetAlphabets)
+    s"Translation from $source to $target"
+  }
+
+  lazy val quizNames =
+    interAlphabetQuestionNames.toVector ++
+    synonymQuestionNames.toVector ++
+    translationQuestionNames.toVector
 
   class Adapter extends BaseAdapter {
 
@@ -95,56 +97,27 @@ class QuizSelector extends BaseActivity with AdapterView.OnItemClickListener {
     listView.setAdapter(new Adapter())
   }
 
-  private def openTranslationQuestion(sourceLanguageCode: Register.LanguageCode, targetLanguageCode: Register.LanguageCode) = {
-    val questionOption = for {
-      sourceLanguage <- linkedDb.languages.values.find(_.code == sourceLanguageCode)
-      targetLanguage <- linkedDb.languages.values.find(_.code == targetLanguageCode)
-      question <- TranslationQuestion.newAleatoryQuestion(linkedDb, sourceLanguage,
-        targetLanguage, sourceLanguage.alphabets.toSet, targetLanguage.alphabets.toSet)
-    } yield {
-      question
+  override def onItemClick(parent: AdapterView[_], view: View, position: Int, id: Long): Unit = {
+    val firstSynonymQuestionPosition = possibleInterAlphabetQuestions.size
+    val firstTranslationQuestionPosition = firstSynonymQuestionPosition + possibleSynonymQuestions.size
+
+    val questionOption = {
+      if (position < firstSynonymQuestionPosition) {
+        val (sources, targets) = possibleInterAlphabetQuestions(position)
+        InterAlphabetQuestion.newAleatoryQuestion(linkedDb, sources, targets)
+      }
+      else if (position < firstTranslationQuestionPosition) {
+        val alphabet = possibleSynonymQuestions(position - firstSynonymQuestionPosition)
+        SynonymQuestion.newAleatoryQuestion(linkedDb, alphabet)
+      }
+      else {
+        val (sourceLanguage, targetLanguage, sourceAlphabets, targetAlphabets) =
+          possibleTranslationQuestions(position - firstTranslationQuestionPosition)
+        TranslationQuestion.newAleatoryQuestion(linkedDb, sourceLanguage, targetLanguage, sourceAlphabets, targetAlphabets)
+      }
     }
 
     if (questionOption.isDefined) Question.openWith(this, questionOption.get)
     else Toast.makeText(this, s"No question can be created for the current database", Toast.LENGTH_SHORT).show()
-  }
-
-  override def onItemClick(parent: AdapterView[_], view: View, position: Int, id: Long): Unit = {
-    val interAlphabetQuestionTypeCount = possibleInterAlphabetQuestions.size
-
-    if (position < interAlphabetQuestionTypeCount) {
-      val (sources, targets) = possibleInterAlphabetQuestions(position)
-      val questionOption = InterAlphabetQuestion.newAleatoryQuestion(linkedDb, sources, targets)
-      questionOption.foreach(question => Question.openWith(this, question))
-    }
-    else if (position < interAlphabetQuestionTypeCount + possibleSynonymQuestions.size) {
-      val alphabet = possibleSynonymQuestions(position - interAlphabetQuestionTypeCount)
-      val questionOption = SynonymQuestion.newAleatoryQuestion(linkedDb, alphabet)
-      questionOption.foreach(question => Question.openWith(this, question))
-    }
-    else {
-      quizNames(position) match {
-        case quizTypes.translationEnSp =>
-          openTranslationQuestion(SQLiteStorageManager.englishCode,
-            SQLiteStorageManager.spanishCode)
-        case quizTypes.translationEnJp =>
-          openTranslationQuestion(SQLiteStorageManager.englishCode,
-            SQLiteStorageManager.japaneseCode)
-        case quizTypes.translationSpEn =>
-          openTranslationQuestion(SQLiteStorageManager.spanishCode,
-            SQLiteStorageManager.englishCode)
-        case quizTypes.translationSpJp =>
-          openTranslationQuestion(SQLiteStorageManager.spanishCode,
-            SQLiteStorageManager.japaneseCode)
-        case quizTypes.translationJpEn =>
-          openTranslationQuestion(SQLiteStorageManager.japaneseCode,
-            SQLiteStorageManager.englishCode)
-        case quizTypes.translationJpSp =>
-          openTranslationQuestion(SQLiteStorageManager.japaneseCode,
-            SQLiteStorageManager.spanishCode)
-        case _ =>
-          Toast.makeText(this, s"Clicked on ${quizNames(position)}", Toast.LENGTH_SHORT).show()
-      }
-    }
   }
 }
