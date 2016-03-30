@@ -3,8 +3,10 @@ package sword.langbook.android.db
 import android.content.Context
 import android.database.Cursor
 import android.database.sqlite.{SQLiteDatabase, SQLiteOpenHelper}
+import android.util.Log
 import sword.db.Register.CollectionId
 import sword.db._
+import sword.langbook.db.registers.WordConcept
 
 import scala.collection.mutable.ListBuffer
 
@@ -284,6 +286,121 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   override def onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int): Unit = {
     if (newVersion == SQLiteStorageManager.currentDbVersion) {
       createTables(db)
+      initializeDatabase(db)
+    }
+
+    if (oldVersion == 3 && newVersion == SQLiteStorageManager.currentDbVersion) {
+      fromDbVersion3(db)
+    }
+  }
+
+  private def fromDbVersion3(db: SQLiteDatabase): Unit = {
+    import sword.langbook.db.registers
+
+    val cursor = db.query("WordRegister", Array("mWrittenWord", "mPronunciation", "meaning"),
+      null, null, null, null, null, null)
+
+    if (cursor != null) try {
+      if (cursor.getCount > 0 && cursor.moveToFirst()) {
+        val symbols = scala.collection.mutable.Set[Char]()
+        do {
+          symbols ++= cursor.getString(0) ++= cursor.getString(1) ++= cursor.getString(2)
+        } while(cursor.moveToNext())
+
+        val currentSymbols = keysFor(db, registers.Symbol).flatMap(k => get(db, k).map((k,_))).toMap.flatMap { case (key, reg) =>
+          reg.fields.collectFirst { case f: UnicodeField => f.value }.map((key, _))
+        }
+
+        val allSymbols = currentSymbols ++ (for {
+          missingSymbol <- symbols.map(_.toInt).toSet.diff(currentSymbols.values.toSet)
+        } yield {
+          val keyOpt = insert(db, registers.Symbol(missingSymbol))
+          (keyOpt.get, missingSymbol)
+        })
+
+        if (!cursor.moveToFirst()) return
+
+        val allSymbolsReverse = allSymbols.map { case (a,b) => (b, a) }
+
+        val (spanishKey, spanishAlphabetKey) = keysFor(db, registers.Language).flatMap(k => get(db, k).map((k,_))).find {
+          case (_,reg) =>
+            reg.fields.collectFirst {
+              case f: LanguageCodeField if f.code == "es" => true
+            }.isDefined
+        }.flatMap {
+          case (languageKey, reg) =>
+            reg.fields.collectFirst {
+              case f: ForeignKeyField if f.definition.target == registers.Alphabet => f.key
+            }.map((languageKey, _))
+        }.get
+
+        val (japaneseKey, kanjiKey) = keysFor(db, registers.Language).flatMap(k => get(db, k).map((k,_))).find {
+          case (_,reg) =>
+            reg.fields.collectFirst {
+              case f: LanguageCodeField if f.code == "ja" => true
+            }.isDefined
+        }.flatMap {
+          case (languageKey, reg) =>
+            reg.fields.collectFirst {
+              case f: ForeignKeyField if f.definition.target == registers.Alphabet => f.key
+            }.map((languageKey, _))
+        }.get
+        Log.i("kana extraction", "japaneseKey is " + japaneseKey.encoded)
+        Log.i("kana extraction", "kanjiKey is " + kanjiKey.encoded)
+
+        val words = keysFor(db, registers.Word).flatMap(get(db, _))
+        Log.i("kana extraction", "words size is " + words.size)
+
+        val piecePositionKeys = words.filter {
+          _.fields.collectFirst {
+            case f: ForeignKeyField if f.definition.target == registers.Language && f
+              .key == japaneseKey => true
+          }.isDefined
+        }.map { wordReg =>
+          wordReg.fields.collectFirst {
+            case f: CollectionReferenceField if f.definition.target == registers.PiecePosition =>
+              f.collectionId
+          }.get
+        }
+        Log.i("kana extraction", "piecePositionKeys size is " + piecePositionKeys.size)
+
+        val pieceKeys = piecePositionKeys.flatMap { piecePositionCollectionId =>
+          getMapForCollection(db, registers.PiecePosition, piecePositionCollectionId).values.flatMap {
+            _.fields.collectFirst {
+              case f: CollectionReferenceField if f.definition.target == registers.Piece => f.collectionId
+            }
+          }
+        }
+        Log.i("kana extraction", "pieceKeys size is " + pieceKeys.size)
+
+        val alphabetKeys = pieceKeys.flatMap { pieceCollectionId =>
+          getMapForCollection(db, registers.Piece, pieceCollectionId).values.map {
+            _.fields.collectFirst {
+              case f: ForeignKeyField if f.definition.target == registers.Alphabet => f.key
+            }.get
+          }
+        }
+        Log.i("kana extraction", "alphabetKeys size is " + pieceKeys.size)
+
+        val kanaKey = (alphabetKeys - kanjiKey).head
+
+        do {
+          val written = insert(db, cursor.getString(0).map(c => registers.SymbolPosition(allSymbolsReverse(c.toInt)))).get
+          val kana = insert(db, cursor.getString(1).map(c => registers.SymbolPosition(allSymbolsReverse(c.toInt)))).get
+          val meaning = insert(db, cursor.getString(2).map(c => registers.SymbolPosition(allSymbolsReverse(c.toInt)))).get
+          val jaPiece = insert(db, List(registers.Piece(kanjiKey, written), registers.Piece(kanaKey, kana))).get
+          val esPiece = insert(db, List(registers.Piece(spanishAlphabetKey, meaning))).get
+          val jaPieceArray = insert(db, List(registers.PiecePosition(jaPiece))).get
+          val esPieceArray = insert(db, List(registers.PiecePosition(esPiece))).get
+          val jaWord = insert(db, registers.Word(japaneseKey, jaPieceArray)).get
+          val esWord = insert(db, registers.Word(spanishKey, esPieceArray)).get
+          val concept = insert(db, registers.Concept(cursor.getString(0))).get
+          insert(db, registers.WordConcept(jaWord, concept))
+          insert(db, registers.WordConcept(esWord, concept))
+        } while(cursor.moveToNext())
+      }
+    } finally {
+      cursor.close()
     }
   }
 
