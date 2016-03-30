@@ -122,10 +122,6 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val japaneseJpText = "日本語"
     val japaneseKanaText = "にほんご"
 
-    // Temporally they are different to distinguish them
-    val enAlphabetText = "latin"
-    val spAlphabetText = "Latino"
-
     val kanjiJpText = "漢字"
     val kanjiKanaText = "かんじ"
     val kanaJpText = "仮名"
@@ -135,7 +131,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
         englishEnText + englishSpText + englishJpText + englishKanaText +
         spanishEnText + spanishSpText + spanishJpText + spanishKanaText +
         japaneseEnText + japaneseSpText + japaneseJpText + japaneseKanaText +
-        enAlphabetText + spAlphabetText + kanjiJpText + kanjiKanaText + kanaJpText + kanaKanaText
+        kanjiJpText + kanjiKanaText + kanaJpText + kanaKanaText
 
     val symbols = {
       for {
@@ -175,8 +171,6 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val japaneseSpSymbolArrayCollection = insert(db, japaneseSpText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
     val japaneseJpSymbolArrayCollection = insert(db, japaneseJpText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
     val japaneseKanaSymbolArrayCollection = insert(db, japaneseKanaText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
-    val enAlphabetEnSymbolArrayCollection = insert(db, enAlphabetText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
-    val spAlphabetSpSymbolArrayCollection = insert(db, spAlphabetText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
     val kanjiJpSymbolArrayCollection = insert(db, kanjiJpText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
     val kanjiKanaSymbolArrayCollection = insert(db, kanjiKanaText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
     val kanaJpSymbolArrayCollection = insert(db, kanaJpText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
@@ -200,8 +194,6 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
         registers.Piece(kanjiAlphabetKey, japaneseJpSymbolArrayCollection),
         registers.Piece(kanaAlphabetKey, japaneseKanaSymbolArrayCollection)
     )).get
-    val enAlphabetEnPiece = insert(db, List(registers.Piece(enAlphabetKey, enAlphabetEnSymbolArrayCollection))).get
-    val spAlphabetSpPiece = insert(db, List(registers.Piece(spAlphabetKey, spAlphabetSpSymbolArrayCollection))).get
     val kanjiJpPiece = insert(db, List(
       registers.Piece(kanjiAlphabetKey, kanjiJpSymbolArrayCollection),
       registers.Piece(kanaAlphabetKey, kanjiKanaSymbolArrayCollection)
@@ -220,8 +212,6 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val japaneseEnPieceArray = insert(db, List(registers.PiecePosition(japaneseEnPiece))).get
     val japaneseSpPieceArray = insert(db, List(registers.PiecePosition(japaneseSpPiece))).get
     val japaneseJpPieceArray = insert(db, List(registers.PiecePosition(japaneseJpPiece))).get
-    val enAlphabetEnPieceArray = insert(db, List(registers.PiecePosition(enAlphabetEnPiece))).get
-    val spAlphabetSpPieceArray = insert(db, List(registers.PiecePosition(spAlphabetSpPiece))).get
     val kanjiJpPieceArray = insert(db, List(registers.PiecePosition(kanjiJpPiece))).get
     val kanaJpPieceArray = insert(db, List(registers.PiecePosition(kanaJpPiece))).get
 
@@ -234,8 +224,6 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val japaneseEnWord = insert(db, registers.Word(englishKey, japaneseEnPieceArray)).get
     val japaneseSpWord = insert(db, registers.Word(spanishKey, japaneseSpPieceArray)).get
     val japaneseJpWord = insert(db, registers.Word(japaneseKey, japaneseJpPieceArray)).get
-    val enAlphabetEnWord = insert(db, registers.Word(englishKey, enAlphabetEnPieceArray)).get
-    val spAlphabetSpWord = insert(db, registers.Word(spanishKey, spAlphabetSpPieceArray)).get
     val kanjiJpWord = insert(db, registers.Word(japaneseKey, kanjiJpPieceArray)).get
     val kanaJpWord = insert(db, registers.Word(japaneseKey, kanaJpPieceArray)).get
 
@@ -248,8 +236,12 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     insert(db, registers.WordConcept(japaneseEnWord, japaneseConceptKey))
     insert(db, registers.WordConcept(japaneseSpWord, japaneseConceptKey))
     insert(db, registers.WordConcept(japaneseJpWord, japaneseConceptKey))
-    insert(db, registers.WordConcept(enAlphabetEnWord, enAlphabetConceptKey))
-    insert(db, registers.WordConcept(spAlphabetSpWord, spAlphabetConceptKey))
+    insert(db, registers.WordConcept(englishEnWord, enAlphabetConceptKey))
+    insert(db, registers.WordConcept(englishSpWord, enAlphabetConceptKey))
+    insert(db, registers.WordConcept(englishJpWord, enAlphabetConceptKey))
+    insert(db, registers.WordConcept(spanishEnWord, spAlphabetConceptKey))
+    insert(db, registers.WordConcept(spanishSpWord, spAlphabetConceptKey))
+    insert(db, registers.WordConcept(spanishJpWord, spAlphabetConceptKey))
     insert(db, registers.WordConcept(kanjiJpWord, kanjiAlphabetConceptKey))
     insert(db, registers.WordConcept(kanaJpWord, kanaAlphabetConceptKey))
   }
