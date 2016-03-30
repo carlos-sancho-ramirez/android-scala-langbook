@@ -37,7 +37,7 @@ class QuizSelector extends BaseActivity with AdapterView.OnItemClickListener {
     } yield {
       val sourceText = sources.flatMap(_.suitableTextForLanguage(prefLang)).mkString(", ")
       val targetText = targets.flatMap(_.suitableTextForLanguage(prefLang)).mkString(", ")
-      s"Inter-alphabet from $sourceText to $targetText"
+      getString(R.string.interAlphabetQuizName, sourceText, targetText)
     }
   }
 
@@ -45,7 +45,7 @@ class QuizSelector extends BaseActivity with AdapterView.OnItemClickListener {
     alphabet <- possibleSynonymQuestions
   } yield {
     val text = alphabet.suitableTextForLanguage(preferredLanguage).getOrElse("?")
-    s"Synonym for $text alphabet"
+    getString(R.string.synonymQuizName, text)
   }
 
   private def translationQuestionAlphabetName(language: Language, alphabets: Set[Alphabet]) = {
@@ -62,7 +62,7 @@ class QuizSelector extends BaseActivity with AdapterView.OnItemClickListener {
   } yield {
     val source = translationQuestionAlphabetName(sourceLanguage, sourceAlphabets)
     val target = translationQuestionAlphabetName(targetLanguage, targetAlphabets)
-    s"Translation from $source to $target"
+    getString(R.string.translationQuizName, source, target)
   }
 
   lazy val quizNames =
@@ -118,6 +118,6 @@ class QuizSelector extends BaseActivity with AdapterView.OnItemClickListener {
     }
 
     if (questionOption.isDefined) Question.openWith(this, questionOption.get)
-    else Toast.makeText(this, s"No question can be created for the current database", Toast.LENGTH_SHORT).show()
+    else Toast.makeText(this, R.string.noQuestionNotice, Toast.LENGTH_SHORT).show()
   }
 }

@@ -16,6 +16,10 @@
 
     <!-- Questions -->
     <string name="checkAnswerButton">Check answer</string>
+    <string name="interAlphabetQuizName">Inter-alphabet from %1$s to %2$s</string>
+    <string name="synonymQuizName">Synonym for %1$s</string>
+    <string name="translationQuizName">Translation from %1$s to %2$s</string>
+    <string name="noQuestionNotice">No question can be created for the current database</string>
 
     <!-- Menu options -->
     <string name="newLanguageOption">New language</string>
