@@ -9,7 +9,7 @@ case class WordDetailsAdapter(activity: Activity, alphabets: IndexedSeq[String],
     synonyms: IndexedSeq[Word], translations: IndexedSeq[Word])
     extends RecyclerView.Adapter[WordDetailsViewHolder] {
 
-  val alphabetsSectionCount = 1 + alphabets.size
+  val alphabetsSectionCount = if (alphabets.size > 1) 1 + alphabets.size else 0
   val languageSectionCount = 2
   val synonymsSectionCount = {
     val size = synonyms.size
@@ -32,9 +32,18 @@ case class WordDetailsAdapter(activity: Activity, alphabets: IndexedSeq[String],
   }
 
   val sectionHeaderPositions = {
-    val map = scala.collection.mutable.Map(0 -> sectionTitles.alphabets,
-      alphabetsSectionCount -> sectionTitles.language)
-    var currentPos = alphabetsSectionCount + languageSectionCount
+    var currentPos = 0
+    val map = scala.collection.mutable.Map[Int, String]()
+
+    if (alphabetsSectionCount > 0) {
+      map += currentPos -> sectionTitles.alphabets
+      currentPos += alphabetsSectionCount
+    }
+
+    if (languageSectionCount > 0) {
+      map += currentPos -> sectionTitles.language
+      currentPos += languageSectionCount
+    }
 
     if (synonymsSectionCount > 0) {
       map += currentPos -> sectionTitles.synonyms
