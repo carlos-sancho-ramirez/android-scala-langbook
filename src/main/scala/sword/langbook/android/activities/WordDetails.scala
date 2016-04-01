@@ -34,11 +34,7 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
   }
 
   def updateUi(): Unit = {
-    val title = wordOption.map {
-      word =>
-        word.text.getOrElse(word.language.preferredAlphabet, "")
-    }.getOrElse(getString(R.string.appName))
-
+    val title = wordOption.flatMap(_.suitableText).getOrElse(getString(R.string.appName))
     val toolBar = findView(TR.toolBar)
     toolBar.setTitle(title)
     toolBar.setOnMenuItemClickListener(this)
@@ -53,22 +49,15 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
     var synonyms = Vector[Word]()
     var translations = Vector[Word]()
 
-    for {
-      word <- wordOption
-    } {
+    for (word <- wordOption) {
       val language = word.language
-      val preferredAlphabet = language.preferredAlphabet
 
       alphabetStrings = word.text.flatMap {
         case (alphabet, thisText) =>
-          val alphabetText = alphabet.concept.words.headOption.flatMap(_.text.values.headOption)
-          alphabetText.map(alphabetText => s"$alphabetText: $thisText")
+          alphabet.suitableTextForLanguage(preferredLanguage).map(alphabetText => s"$alphabetText: $thisText")
       }.toVector
 
-      for {
-        word <- language.concept.wordsForLanguage(language).headOption
-        text <- word.text.get(preferredAlphabet)
-      } {
+      for (text <- language.suitableTextForLanguage(preferredLanguage)) {
         languageText = text
       }
 
