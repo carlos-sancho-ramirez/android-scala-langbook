@@ -9,17 +9,20 @@ case class WordDetailsAdapter(activity: Activity, alphabets: IndexedSeq[String],
     synonyms: IndexedSeq[Word], translations: IndexedSeq[Word])
     extends RecyclerView.Adapter[WordDetailsViewHolder] {
 
-  val alphabetsSectionCount = if (alphabets.size > 1) 1 + alphabets.size else 0
+  val alphabetsSectionCount = {
+    val size = alphabets.size
+    if (size > 1) 1 + size else 0
+  }
   val languageSectionCount = 2
   val synonymsSectionCount = {
     val size = synonyms.size
-    if (size > 0) 1 + synonyms.size
+    if (size > 0) 1 + size
     else 0
   }
 
   val translationsSectionCount = {
     val size = translations.size
-    if (size > 0) 1 + translations.size
+    if (size > 0) 1 + size
     else 0
   }
 
@@ -103,7 +106,7 @@ case class WordDetailsAdapter(activity: Activity, alphabets: IndexedSeq[String],
                 WordDetails.openWith(activity, RequestCodes.checkWordDetails, synonym)
               }
             })
-            synonym.text(synonym.language.preferredAlphabet)
+            synonym.suitableText.getOrElse("")
           case sectionTitles.translations =>
             val translation = translations(relPosition)
             holder.linearLayout.setClickable(true)
@@ -112,7 +115,7 @@ case class WordDetailsAdapter(activity: Activity, alphabets: IndexedSeq[String],
                 WordDetails.openWith(activity, RequestCodes.checkWordDetails, translation)
               }
             })
-            translation.text(translation.language.preferredAlphabet)
+            translation.suitableText.getOrElse("")
         }
 
         holder.textView.setText(text)
