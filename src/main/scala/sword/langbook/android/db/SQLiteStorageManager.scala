@@ -257,6 +257,47 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
   }
 
+  private def getMapFor(db: SQLiteDatabase, regDef: RegisterDefinition, filter: ForeignKeyField): scala.collection.Map[Key, Register] = {
+    val array = (regDef match {
+      case _: CollectibleRegisterDefinition =>
+        Array(SQLiteStorageManager.idKey, SQLiteStorageManager.collKey)
+      case _ =>
+        Array(SQLiteStorageManager.idKey)
+    }) ++ regDef.fields.map(fieldName(regDef,_))
+
+    val whereClause = s"${fieldName(regDef, filter)}=${filter.key.index}"
+    val cursor = db.query(tableName(regDef), array, whereClause, null, null, null, null, null)
+
+    if (cursor == null) Map()
+    else try {
+      if (cursor.getCount <= 0 || !cursor.moveToFirst()) Map()
+      else {
+        val buffer = new ListBuffer[(Key, Register)]()
+        do {
+          val group = regDef match {
+            case _: CollectibleRegisterDefinition => cursor.getInt(1)
+            case _ => 0
+          }
+          val key = obtainKey(regDef, group, cursor.getInt(0))
+          val reg = fromCursor(regDef, cursor)
+          buffer += ((key, reg))
+        } while(cursor.moveToNext())
+        buffer.result().toMap
+      }
+    } finally {
+      cursor.close()
+    }
+  }
+
+  override def getMapFor(registerDefinition: RegisterDefinition, filter: ForeignKeyField): scala.collection.Map[Key, Register] = {
+    val db = getReadableDatabase
+    try {
+      getMapFor(db, registerDefinition, filter)
+    } finally {
+      db.close()
+    }
+  }
+
   private def getMapForCollection(db: SQLiteDatabase,
       registerDefinition: CollectibleRegisterDefinition, id: CollectionId): Map[Key, Register] = {
     val keys = Seq(SQLiteStorageManager.idKey) ++ registerDefinition.fields.map(fieldName(registerDefinition,_))
