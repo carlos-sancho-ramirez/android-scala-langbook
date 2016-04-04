@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.support.v7.widget.{LinearLayoutManager, Toolbar}
+import android.util.Log
 import android.view.{MenuItem, Menu}
 import sword.langbook.android.{TR, R}
 import sword.langbook.db.Word
@@ -46,6 +47,7 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
   def updateAdapter(): Unit = {
     var alphabetStrings = Vector[String]()
     var languageText = ""
+    var acceptations = Vector[String]()
     var synonyms = Vector[Word]()
     var translations = Vector[Word]()
 
@@ -61,12 +63,16 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
         languageText = text
       }
 
+      acceptations = word.concepts.flatMap(_.isTypeOf)
+          .flatMap(_.wordsForLanguage(preferredLanguage).headOption)
+          .flatMap(_.suitableText).map(text => s"Type of $text").toVector
+
       synonyms = word.synonyms.toVector
       translations = word.translations.toVector
     }
 
     findView(TR.recyclerView).setAdapter(new WordDetailsAdapter(this, alphabetStrings,
-        languageText, synonyms, translations))
+        languageText, acceptations, synonyms, translations))
   }
 
   def updateMenu(menu :Menu) = {

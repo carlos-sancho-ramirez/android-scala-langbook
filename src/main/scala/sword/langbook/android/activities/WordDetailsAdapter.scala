@@ -6,7 +6,7 @@ import android.view.{View, ViewGroup}
 import sword.langbook.db.Word
 
 case class WordDetailsAdapter(activity: Activity, alphabets: IndexedSeq[String], language: String,
-    synonyms: IndexedSeq[Word], translations: IndexedSeq[Word])
+    acceptations: IndexedSeq[String], synonyms: IndexedSeq[Word], translations: IndexedSeq[Word])
     extends RecyclerView.Adapter[WordDetailsViewHolder] {
 
   val alphabetsSectionCount = {
@@ -14,6 +14,13 @@ case class WordDetailsAdapter(activity: Activity, alphabets: IndexedSeq[String],
     if (size > 1) 1 + size else 0
   }
   val languageSectionCount = 2
+
+  val acceptationsSectionCount = {
+    val size = acceptations.size
+    if (size > 0) 1 + size
+    else 0
+  }
+
   val synonymsSectionCount = {
     val size = synonyms.size
     if (size > 0) 1 + size
@@ -30,6 +37,7 @@ case class WordDetailsAdapter(activity: Activity, alphabets: IndexedSeq[String],
   object sectionTitles {
     val alphabets = "Alphabets"
     val language = "Language"
+    val acceptations = "Acceptations"
     val synonyms = "Synonyms"
     val translations = "Translations"
   }
@@ -48,6 +56,11 @@ case class WordDetailsAdapter(activity: Activity, alphabets: IndexedSeq[String],
       currentPos += languageSectionCount
     }
 
+    if (acceptationsSectionCount > 0) {
+      map += currentPos -> sectionTitles.acceptations
+      currentPos += acceptationsSectionCount
+    }
+
     if (synonymsSectionCount > 0) {
       map += currentPos -> sectionTitles.synonyms
       currentPos += synonymsSectionCount
@@ -62,7 +75,8 @@ case class WordDetailsAdapter(activity: Activity, alphabets: IndexedSeq[String],
   }
 
   override val getItemCount = {
-    alphabetsSectionCount + languageSectionCount + synonymsSectionCount + translationsSectionCount
+    alphabetsSectionCount + languageSectionCount + synonymsSectionCount + translationsSectionCount +
+      acceptationsSectionCount
   }
 
   object ViewTypes {
@@ -98,6 +112,9 @@ case class WordDetailsAdapter(activity: Activity, alphabets: IndexedSeq[String],
           case sectionTitles.language =>
             holder.linearLayout.setClickable(false)
             language
+          case sectionTitles.acceptations =>
+            holder.linearLayout.setClickable(false)
+            acceptations(relPosition)
           case sectionTitles.synonyms =>
             val synonym = synonyms(relPosition)
             holder.linearLayout.setClickable(true)
