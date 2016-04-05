@@ -65,7 +65,7 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
 
       acceptations = word.concepts.flatMap(_.isTypeOf)
           .flatMap(_.wordsForLanguage(preferredLanguage).headOption)
-          .flatMap(_.suitableText).map(text => s"Type of $text").toVector
+          .flatMap(_.suitableText).toVector
 
       synonyms = word.synonyms.toVector
       translations = word.translations.toVector
