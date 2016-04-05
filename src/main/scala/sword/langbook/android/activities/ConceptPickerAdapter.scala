@@ -41,7 +41,6 @@ case class ConceptPickerAdapter(activity: Activity, concepts: Seq[String]) exten
     vh match {
       case holder: ConceptPickerHeaderViewHolder =>
         holder.textView.setText(descriptionHeaderText)
-        Toast.makeText(activity, s"Description Header text: $descriptionHeaderText", Toast.LENGTH_SHORT).show()
 
       case holder: ConceptPickerEntryViewHolder =>
         holder.textView.setText(concepts(position - 1))
