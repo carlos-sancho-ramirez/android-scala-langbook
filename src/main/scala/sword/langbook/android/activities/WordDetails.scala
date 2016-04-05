@@ -103,7 +103,10 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
               false
           }
         }
-        else false
+        else {
+          ConceptPicker.openWith(this, RequestCodes.pickConcepts, concepts)
+          true
+        }
       }
     }
 
