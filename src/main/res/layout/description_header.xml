@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <TextView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"/>
+    android:layout_height="wrap_content"
+    android:paddingTop="@dimen/descriptionHeaderVerticalPadding"
+    android:paddingBottom="@dimen/descriptionHeaderVerticalPadding"
+    android:paddingLeft="@dimen/descriptionHeaderHorizontalPadding"
+    android:paddingRight="@dimen/descriptionHeaderHorizontalPadding"
+    android:gravity="center"/>
