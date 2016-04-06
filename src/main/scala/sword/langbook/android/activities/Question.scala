@@ -50,14 +50,14 @@ class Question extends BaseActivity with View.OnClickListener {
   }
 
   def updateView(): Unit = {
-    val button = findViewById(R.id.checkAnswerButton)
+    val button = findView(TR.checkAnswerButton)
     if (_displayingAnswer) {
-      button.setVisibility(View.GONE)
+      button.setText(R.string.nextQuestionButton)
     }
     else {
-      button.setOnClickListener(this)
-      button.setVisibility(View.VISIBLE)
+      button.setText(R.string.checkAnswerButton)
     }
+    button.setOnClickListener(this)
 
     val container = findView(TR.entryContainer)
     container.removeAllViews()
@@ -89,8 +89,16 @@ class Question extends BaseActivity with View.OnClickListener {
   }
 
   override def onClick(v: View): Unit = {
-    _displayingAnswer = true
-    updateView()
+    if (_displayingAnswer) {
+      _displayingAnswer = false
+      _question = questionBuilder(linkedDb).orNull
+      if (_question == null) finish()
+      else updateView()
+    }
+    else {
+      _displayingAnswer = true
+      updateView()
+    }
   }
 
   override def onSaveInstanceState(state: Bundle): Unit = {

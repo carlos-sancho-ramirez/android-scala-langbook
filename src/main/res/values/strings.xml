@@ -20,6 +20,7 @@
 
     <!-- Questions -->
     <string name="checkAnswerButton">Check answer</string>
+    <string name="nextQuestionButton">Next question</string>
     <string name="interAlphabetQuizName">Inter-alphabet from %1$s to %2$s</string>
     <string name="synonymQuizName">Synonym for %1$s</string>
     <string name="translationQuizName">Translation from %1$s to %2$s</string>

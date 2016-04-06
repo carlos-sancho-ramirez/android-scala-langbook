@@ -13,7 +13,6 @@
     <Button
         android:id="@+id/checkAnswerButton"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/checkAnswerButton"/>
+        android:layout_height="wrap_content"/>
 
 </LinearLayout>
