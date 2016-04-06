@@ -11,6 +11,7 @@
     <string name="startQuizButton">Evaluate yourself</string>
 
     <!-- Concept picker -->
+    <string name="conceptPickerTitle">Select concepts</string>
     <string name="conceptPickerDescriptionHeader">Words are linked to concepts. This way words that are linked to the same concept are synonyms if they belong to the same language or translations if they come from different languages.\n\nAs this word has more than one concept, please select which ones would you like to share with the new word.</string>
 
     <!-- Word editor -->

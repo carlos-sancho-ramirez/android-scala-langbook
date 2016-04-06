@@ -42,7 +42,10 @@
             android:name=".activities.WordEditor"
             android:label="@string/appName"/>
 
-        <activity android:name=".activities.ConceptPicker"/>
+        <activity
+            android:name=".activities.ConceptPicker"
+            android:label="@string/conceptPickerTitle"/>
+
         <activity android:name=".activities.QuizSelector"/>
         <activity android:name=".activities.Question"/>
     </application>

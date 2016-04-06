@@ -33,6 +33,7 @@ class ConceptPicker extends BaseActivity {
   override def onCreate(savedInstanceState: Bundle) = {
     super.onCreate(savedInstanceState)
     setContentView(R.layout.concept_picker)
+    setSupportActionBar(findView(TR.toolBar))
 
     // TODO: Using hints as temporal solution until we implement a proper way to distinguish among concepts
     val recyclerView = findView(TR.recyclerView)
