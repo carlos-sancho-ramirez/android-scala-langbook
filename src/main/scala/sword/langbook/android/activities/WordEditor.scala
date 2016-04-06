@@ -14,12 +14,19 @@ object WordEditor {
   private val className = "sword.langbook.android.activities.WordEditor"
 
   def openWith(activity: Activity, requestCode: Int = 0, concept: Concept = null,
-               language: Language = null, excludedLanguage: Language = null) = {
+               conceptEncodedKeys:Array[String] = null, language: Language = null,
+               excludedLanguage: Language = null) = {
     val intent = new Intent()
     intent.setClassName(activity, className)
 
-    if (concept != null) {
-      intent.putExtra(BundleKeys.conceptKey, concept.key.encoded)
+    val concepts = {
+      if (conceptEncodedKeys != null) conceptEncodedKeys
+      else if (concept != null) Array(concept.key.encoded)
+      else null
+    }
+
+    if (concepts != null) {
+      intent.putExtra(BundleKeys.conceptKeys, concepts)
     }
 
     if (language != null) {
@@ -83,9 +90,7 @@ class WordEditor extends BaseActivity with View.OnClickListener {
       for {
         languageKey <- langKeyOpt
         alphabet <- Language(languageKey).alphabets
-        // TODO: Simplify the way to retrieve a word for and Alphabet for a given language
-        alphabetWord <- alphabet.concept.words.headOption
-        alphabetText <- alphabetWord.text.get(Language(languageKey).preferredAlphabet)
+        alphabetText <- alphabet.suitableTextForLanguage(preferredLanguage)
       } {
         val entry = inflater.inflate(TR.layout.word_editor_entry, container)
         entry.setTag(alphabet)
@@ -158,15 +163,15 @@ class WordEditor extends BaseActivity with View.OnClickListener {
 
         val word = pieceArray.flatMap(array => manager.insert(registers.Word(languageKey, array)))
 
-        val argsConceptKey = manager.decode(getIntent.getStringExtra(BundleKeys.conceptKey))
-        val conceptKeyOpt = {
+        val argsConceptKey = getIntent.getStringArrayExtra(BundleKeys.conceptKeys).flatMap(manager.decode)
+        val conceptKeys = {
           if (argsConceptKey.nonEmpty) argsConceptKey
-          else manager.insert(registers.Concept(findView(TR.wordField).getText.toString))
+          else manager.insert(registers.Concept(findView(TR.wordField).getText.toString)).toArray
         }
 
         for {
           wordKey <- word
-          conceptKey <- conceptKeyOpt
+          conceptKey <- conceptKeys
         } {
           manager.insert(registers.WordConcept(wordKey, conceptKey))
         }

@@ -84,28 +84,21 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
     val result = {
       for (word <- wordOption) yield {
         val concepts = word.concepts
+        val concrete = concepts.size == 1
 
-        // Currently the user only can create a synonym or translation for a word with only one concept linked.
-        // This limitation should be removed whenever there is a suitable option available to
-        // distinguish among concepts in a human readable way.
-        // TODO: Change this when possible to allow the user selecting to which concept should be linked
-        if (concepts.size == 1) {
-          item.getItemId match {
-            case R.id.newSynonymOption =>
-              WordEditor.openWith(this, RequestCodes.addNewWord, concept = concepts.head, language = word.language)
-              true
+        item.getItemId match {
+          case R.id.newSynonymOption =>
+            if (concrete) WordEditor.openWith(this, RequestCodes.addNewWord, concept = concepts.head, language = word.language)
+            else ConceptPicker.openWith(this, RequestCodes.pickConceptsForSynonym, concepts)
+            true
 
-            case R.id.newTranslationOption =>
-              WordEditor.openWith(this, RequestCodes.addNewWord, concept = concepts.head, excludedLanguage = word.language)
-              true
+          case R.id.newTranslationOption =>
+            if (concrete) WordEditor.openWith(this, RequestCodes.addNewWord, concept = concepts.head, excludedLanguage = word.language)
+            else ConceptPicker.openWith(this, RequestCodes.pickConceptsForTranslation, concepts)
+            true
 
-            case _ =>
-              false
-          }
-        }
-        else {
-          ConceptPicker.openWith(this, RequestCodes.pickConcepts, concepts)
-          true
+          case _ =>
+            false
         }
       }
     }
@@ -114,9 +107,24 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
   }
 
   override def onActivityResult(requestCode :Int, resultCode :Int, data :Intent) :Unit = {
-    requestCode match {
-      case RequestCodes.`addNewWord` => if (resultCode == Activity.RESULT_OK) updateUi()
-      case _ => super.onActivityResult(requestCode, resultCode, data)
+    super.onActivityResult(requestCode, resultCode, data)
+
+    if (resultCode == Activity.RESULT_OK && wordOption.isEmpty) {
+      finish()
+    }
+    else {
+      requestCode match {
+        case RequestCodes.`addNewWord` => updateUi()
+        case RequestCodes.`pickConceptsForSynonym` =>
+          WordEditor.openWith(this, RequestCodes.addNewWord,
+            conceptEncodedKeys = data.getStringArrayExtra(BundleKeys.conceptKeys),
+            language = wordOption.get.language)
+        case RequestCodes.`pickConceptsForTranslation` =>
+          WordEditor.openWith(this, RequestCodes.addNewWord,
+            conceptEncodedKeys = data.getStringArrayExtra(BundleKeys.conceptKeys),
+            excludedLanguage = wordOption.get.language)
+        case _ => super.onActivityResult(requestCode, resultCode, data)
+      }
     }
   }
 }

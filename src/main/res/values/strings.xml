@@ -31,6 +31,7 @@
     <string name="newTranslationOption">New translation</string>
     <string name="newWordOption">New word</string>
     <string name="deleteWordsOption">Delete words</string>
+    <string name="continueOption">Continue</string>
 
     <!-- Warning messages -->
     <string name="oneFieldRequired">Please fill at least one of the fields first</string>
