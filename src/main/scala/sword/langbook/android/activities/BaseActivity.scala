@@ -4,6 +4,7 @@ import java.util.Locale
 
 import android.support.v7.app.AppCompatActivity
 import sword.langbook.android.{LangbookApplication, TypedFindView}
+import sword.langbook.db.LinkedStorageManager
 
 /**
   * Base for all activities within the Langbook project.
@@ -11,6 +12,11 @@ import sword.langbook.android.{LangbookApplication, TypedFindView}
   */
 class BaseActivity extends AppCompatActivity with TypedFindView {
   def linkedDb = getApplication.asInstanceOf[LangbookApplication].linkedDb
+
+  def questionBuilder = getApplication.asInstanceOf[LangbookApplication].questionBuilder
+  def questionBuilder_=(builder: LinkedStorageManager => Option[sword.langbook.Question]): Unit = {
+    getApplication.asInstanceOf[LangbookApplication].questionBuilder = builder
+  }
 
   /**
    * Returns the language preferred by the user.

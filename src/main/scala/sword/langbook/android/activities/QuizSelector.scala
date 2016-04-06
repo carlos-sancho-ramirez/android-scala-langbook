@@ -101,23 +101,22 @@ class QuizSelector extends BaseActivity with AdapterView.OnItemClickListener {
     val firstSynonymQuestionPosition = possibleInterAlphabetQuestions.size
     val firstTranslationQuestionPosition = firstSynonymQuestionPosition + possibleSynonymQuestions.size
 
-    val questionOption = {
+    questionBuilder = {
       if (position < firstSynonymQuestionPosition) {
         val (sources, targets) = possibleInterAlphabetQuestions(position)
-        InterAlphabetQuestion.newAleatoryQuestion(linkedDb, sources, targets)
+        InterAlphabetQuestion.newAleatoryQuestion(sources, targets)
       }
       else if (position < firstTranslationQuestionPosition) {
         val alphabet = possibleSynonymQuestions(position - firstSynonymQuestionPosition)
-        SynonymQuestion.newAleatoryQuestion(linkedDb, alphabet)
+        SynonymQuestion.newAleatoryQuestion(alphabet)
       }
       else {
         val (sourceLanguage, targetLanguage, sourceAlphabets, targetAlphabets) =
           possibleTranslationQuestions(position - firstTranslationQuestionPosition)
-        TranslationQuestion.newAleatoryQuestion(linkedDb, sourceLanguage, targetLanguage, sourceAlphabets, targetAlphabets)
+        TranslationQuestion.newAleatoryQuestion(sourceLanguage, targetLanguage, sourceAlphabets, targetAlphabets)
       }
     }
 
-    if (questionOption.isDefined) Question.openWith(this, questionOption.get)
-    else Toast.makeText(this, R.string.noQuestionNotice, Toast.LENGTH_SHORT).show()
+    Question.openWith(this)
   }
 }

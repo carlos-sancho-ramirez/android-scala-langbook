@@ -12,10 +12,9 @@ import sword.langbook.db.{Language, Concept}
 object Question {
   private val className = "sword.langbook.android.activities.Question"
 
-  def openWith(activity: Activity, question: sword.langbook.Question, requestCode: Int = 0) = {
+  def openWith(activity: Activity, requestCode: Int = 0) = {
     val intent = new Intent()
     intent.setClassName(activity, className)
-    intent.putExtra(BundleKeys.question, question.encodedQuestion)
 
     if (requestCode > 0) activity.startActivityForResult(intent, requestCode)
     else activity.startActivity(intent)
@@ -25,14 +24,11 @@ object Question {
 class Question extends BaseActivity with View.OnClickListener {
 
   object StateBundleKeys {
+    val question = "q"
     val displayAnswer = "da"
   }
 
-  lazy val question = {
-    val encoded = getIntent.getStringExtra(BundleKeys.question)
-    sword.langbook.Question.decode(linkedDb, encoded).get
-  }
-
+  private var _question: sword.langbook.Question = null
   private var _displayingAnswer: Boolean = false
 
   override def onCreate(savedInstanceState: Bundle): Unit = {
@@ -40,10 +36,17 @@ class Question extends BaseActivity with View.OnClickListener {
     setContentView(R.layout.question)
 
     if (savedInstanceState != null) {
+      _question = Option(savedInstanceState.getString(StateBundleKeys.question))
+          .flatMap(sword.langbook.Question.decode(linkedDb, _)).orNull
       _displayingAnswer = savedInstanceState.getBoolean(StateBundleKeys.displayAnswer)
     }
 
-    updateView()
+    if (_question == null) {
+      _question = questionBuilder(linkedDb).orNull
+    }
+
+    if (_question == null) finish()
+    else updateView()
   }
 
   def updateView(): Unit = {
@@ -61,7 +64,7 @@ class Question extends BaseActivity with View.OnClickListener {
 
     val inflater = LayoutInflater.from(this)
     for {
-      (alphabet, hint) <- question.clues
+      (alphabet, hint) <- _question.clues
       // TODO: This is getting the first word associated to the Alphabet, this should be checking the language
       alphabetWord <- alphabet.concept.words.headOption
       label <- alphabetWord.text.get(alphabetWord.language.preferredAlphabet)
@@ -72,7 +75,7 @@ class Question extends BaseActivity with View.OnClickListener {
     }
 
     for {
-      (alphabet, hint) <- question.possibleAnswers.head
+      (alphabet, hint) <- _question.possibleAnswers.head
       // TODO: This is getting the first word associated to the Alphabet, this should be checking the language
       alphabetWord <- alphabet.concept.words.headOption
       label <- alphabetWord.text.get(alphabetWord.language.preferredAlphabet)
@@ -92,5 +95,6 @@ class Question extends BaseActivity with View.OnClickListener {
 
   override def onSaveInstanceState(state: Bundle): Unit = {
     state.putBoolean(StateBundleKeys.displayAnswer, _displayingAnswer)
+    state.putString(StateBundleKeys.question, _question.encodedQuestion)
   }
 }
