@@ -13,6 +13,12 @@
         android:text="@string/main" />
 
     <Button
+        android:id="@+id/checkLanguagesButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/checkLanguagesButton"/>
+
+    <Button
         android:id="@+id/checkWordsButton"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

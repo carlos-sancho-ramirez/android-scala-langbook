@@ -7,6 +7,7 @@
 
     <!-- Main activity -->
     <string name="main">Langbook</string>
+    <string name="checkLanguagesButton">Languages</string>
     <string name="checkWordsButton">Dictionary</string>
     <string name="startQuizButton">Evaluate yourself</string>
 

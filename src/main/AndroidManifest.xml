@@ -20,6 +20,8 @@
             android:name=".activities.LanguageSelector"
             android:label="@string/appName"/>
 
+        <activity android:name=".activities.LanguageDetails"/>
+
         <activity
             android:name=".activities.Main"
             android:label="@string/appName">
