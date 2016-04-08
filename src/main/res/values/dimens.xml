@@ -6,4 +6,7 @@
     <dimen name="sectionHeaderDividerWidthInverse">-4dp</dimen>
     <dimen name="descriptionHeaderVerticalPadding">8dp</dimen>
     <dimen name="descriptionHeaderHorizontalPadding">8dp</dimen>
+
+    <dimen name="alphabetDetailsSymbolSide">120dp</dimen>
+    <dimen name="alphabetDetailsSymbolText">24sp</dimen>
 </resources>

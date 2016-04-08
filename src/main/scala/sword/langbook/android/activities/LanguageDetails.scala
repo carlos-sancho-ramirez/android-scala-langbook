@@ -37,7 +37,7 @@ class LanguageDetails extends BaseActivity {
       }
 
       recyclerView.setLayoutManager(new LinearLayoutManager(this))
-      recyclerView.setAdapter(new LanguageDetailsAdapter(preferredLanguage, "", language.alphabets.toVector))
+      recyclerView.setAdapter(new LanguageDetailsAdapter(this, preferredLanguage, "", language.alphabets.toVector))
     }
   }
 }
