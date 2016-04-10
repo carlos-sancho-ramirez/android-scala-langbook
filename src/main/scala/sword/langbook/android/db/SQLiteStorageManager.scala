@@ -30,7 +30,7 @@ object SQLiteStorageManager {
   val japaneseCode = "ja"
 }
 
-class SQLiteStorageManager(context :Context, dbName: String, override val registerDefinitions :Seq[RegisterDefinition])
+class SQLiteStorageManager(context :Context, dbName: String, override val registerDefinitions :Seq[RegisterDefinition[Register]])
     extends SQLiteOpenHelper(context, dbName, null, SQLiteStorageManager.currentDbVersion)
     with StorageManager {
 
@@ -40,7 +40,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     throw new IllegalArgumentException("Duplicated register definitions are not allowed")
   }
 
-  val singleReferences :Seq[(RegisterDefinition, RegisterDefinition)] = for {
+  val singleReferences :Seq[(RegisterDefinition[Register], RegisterDefinition[Register])] = for {
     regDef <- registerDefinitions
     fieldDef <- regDef.fields if fieldDef.isInstanceOf[ForeignKeyFieldDefinition]
   } yield {
@@ -52,12 +52,12 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
       " field must have as target one of the definitions given")
   }
 
-  val groupReferences :Seq[(RegisterDefinition, CollectibleRegisterDefinition)] = for {
+  val groupReferences :Seq[(RegisterDefinition[Register], CollectibleRegisterDefinition[Register])] = for {
     regDef <- registerDefinitions
     fieldDef <- regDef.fields if fieldDef.isInstanceOf[CollectionReferenceFieldDefinition]
   } yield {
-      (regDef, fieldDef.asInstanceOf[CollectionReferenceFieldDefinition].target)
-    }
+    (regDef, fieldDef.asInstanceOf[CollectionReferenceFieldDefinition].target)
+  }
 
   if (groupReferences.exists { case (_,target) => !registerDefinitions.contains(target) }) {
     throw new IllegalArgumentException("All given register definitions that include a collection" +
@@ -67,11 +67,11 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
   private def logi(message :String) = android.util.Log.i("DB", message)
 
-  private def tableName(regDef :RegisterDefinition) :String = s"R${registerDefinitions.indexOf(regDef)}"
+  private def tableName(regDef :RegisterDefinition[Register]) :String = s"R${registerDefinitions.indexOf(regDef)}"
   private def tableName(reg :Register) :String = tableName(reg.definition)
 
-  private def fieldName(regDef :RegisterDefinition, fieldDef :FieldDefinition) :String = s"C${regDef.fields.indexOf(fieldDef)}"
-  private def fieldName(regDef :RegisterDefinition, field :Field) :String = fieldName(regDef, field.definition)
+  private def fieldName(regDef :RegisterDefinition[Register], fieldDef :FieldDefinition) :String = s"C${regDef.fields.indexOf(fieldDef)}"
+  private def fieldName(regDef :RegisterDefinition[Register], field :Field) :String = fieldName(regDef, field.definition)
 
   private def createTables(db :SQLiteDatabase) = {
     for (regDef <- registerDefinitions) {
@@ -86,7 +86,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
         s"${fieldName(regDef, fieldDef)} $sqlType"
       }
       val columns = (regDef match {
-        case _:CollectibleRegisterDefinition => Seq(s"${SQLiteStorageManager.collKey} INTEGER") ++ fields
+        case _: CollectibleRegisterDefinition[_] => Seq(s"${SQLiteStorageManager.collKey} INTEGER") ++ fields
         case _ => fields
       }).mkString(", ")
 
@@ -287,9 +287,9 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
   }
 
-  private def getMapFor(db: SQLiteDatabase, regDef: RegisterDefinition, filter: ForeignKeyField): scala.collection.Map[Key, Register] = {
+  private def getMapFor[R <: Register](db: SQLiteDatabase, regDef: RegisterDefinition[R], filter: ForeignKeyField): scala.collection.Map[Key, R] = {
     val array = (regDef match {
-      case _: CollectibleRegisterDefinition =>
+      case _: CollectibleRegisterDefinition[_] =>
         Array(SQLiteStorageManager.idKey, SQLiteStorageManager.collKey)
       case _ =>
         Array(SQLiteStorageManager.idKey)
@@ -302,10 +302,10 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     else try {
       if (cursor.getCount <= 0 || !cursor.moveToFirst()) Map()
       else {
-        val buffer = new ListBuffer[(Key, Register)]()
+        val buffer = new ListBuffer[(Key, R)]()
         do {
           val group = regDef match {
-            case _: CollectibleRegisterDefinition => cursor.getInt(1)
+            case _: CollectibleRegisterDefinition[_] => cursor.getInt(1)
             case _ => 0
           }
           val key = obtainKey(regDef, group, cursor.getInt(0))
@@ -319,7 +319,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
   }
 
-  override def getMapFor(registerDefinition: RegisterDefinition, filter: ForeignKeyField): scala.collection.Map[Key, Register] = {
+  override def getMapFor[R <: Register](registerDefinition: RegisterDefinition[R], filter: ForeignKeyField): scala.collection.Map[Key, R] = {
     val db = getReadableDatabase
     try {
       getMapFor(db, registerDefinition, filter)
@@ -328,13 +328,13 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
   }
 
-  private def getMapForCollection(db: SQLiteDatabase,
-      registerDefinition: CollectibleRegisterDefinition, id: CollectionId): Map[Key, Register] = {
+  private def getMapForCollection[R <: Register](db: SQLiteDatabase,
+      registerDefinition: CollectibleRegisterDefinition[R], id: CollectionId): Map[Key, R] = {
     val keys = Seq(SQLiteStorageManager.idKey) ++ registerDefinition.fields.map(fieldName(registerDefinition,_))
     val cursor = db.query(tableName(registerDefinition), keys.toArray,
       s"${SQLiteStorageManager.collKey}=${id.toString}", null, null, null, null, null)
 
-    val result = scala.collection.mutable.Map[Key, Register]()
+    val result = scala.collection.mutable.Map[Key, R]()
     if (cursor != null) {
       try {
         if (cursor.getCount > 0 && cursor.moveToFirst()) {
@@ -352,7 +352,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     result.toMap
   }
 
-  override def getMapForCollection(registerDefinition: CollectibleRegisterDefinition, id: CollectionId): Map[Key, Register] = {
+  override def getMapForCollection[R <: Register](registerDefinition: CollectibleRegisterDefinition[R], id: CollectionId): Map[Key, R] = {
     val db = getReadableDatabase
     try {
       getMapForCollection(db, registerDefinition, id)
@@ -361,29 +361,24 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
   }
 
-  private def fromCursor(regDef :RegisterDefinition, cursor :Cursor) :Register = {
-    val resultFields = for (fieldDef <- regDef.fields) yield {
-      val value = cursor.getString(cursor.getColumnIndex(fieldName(regDef, fieldDef)))
+  private def keyExtractor(fieldDef: FieldDefinition)(value: String): Option[Key] = {
+    try {
       fieldDef match {
-        case UnicodeFieldDefinition => UnicodeField(value.toInt)
-        case LanguageCodeFieldDefinition => LanguageCodeField(value)
-        case CharSequenceFieldDefinition => CharSequenceField(value)
-        case f:ForeignKeyFieldDefinition => new ForeignKeyField {
-          override val key = obtainKey(f.target, 0, value.toInt)
-          override val definition = f
-        }
-        case f:CollectionReferenceFieldDefinition => new CollectionReferenceField {
-          override val collectionId = value.toInt
-          override val definition = f
-        }
-        case _ => throw new UnsupportedOperationException("Undefined field definition")
+        case f: ForeignKeyFieldDefinition => Some(obtainKey(f.target, 0, value.toInt))
+        case _ => None
       }
     }
-
-    new Register {
-      override val definition = regDef
-      override val fields = resultFields
+    catch {
+      case _: NumberFormatException => None
     }
+  }
+
+  private def fromCursor[R <: Register](regDef :RegisterDefinition[R], cursor :Cursor) :R = {
+    val fieldValues = for (fieldDef <- regDef.fields) yield {
+      cursor.getString(cursor.getColumnIndex(fieldName(regDef, fieldDef)))
+    }
+
+    regDef.from(fieldValues, keyExtractor).get
   }
 
   private def get(db :SQLiteDatabase, key: Key): Option[Register] = {
@@ -525,7 +520,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
       throw new UnsupportedOperationException("Unable to insert collections for registers with different definitions")
     }
 
-    if (!definitions.head.isInstanceOf[CollectibleRegisterDefinition]) {
+    if (!definitions.head.isInstanceOf[CollectibleRegisterDefinition[_]]) {
       throw new UnsupportedOperationException("Unable to insert collections for non-collectible registers")
     }
 
@@ -537,9 +532,9 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
   }
 
-  private def keysFor(db :SQLiteDatabase, regDef :RegisterDefinition) :Set[Key] = {
+  private def keysFor(db :SQLiteDatabase, regDef :RegisterDefinition[Register]) :Set[Key] = {
     val array = regDef match {
-      case _: CollectibleRegisterDefinition =>
+      case _: CollectibleRegisterDefinition[_] =>
         Array(SQLiteStorageManager.idKey, SQLiteStorageManager.collKey)
       case _ =>
         Array(SQLiteStorageManager.idKey)
@@ -553,7 +548,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
         val buffer = new ListBuffer[Key]()
         do {
           val group = regDef match {
-            case _: CollectibleRegisterDefinition => cursor.getInt(1)
+            case _: CollectibleRegisterDefinition[_] => cursor.getInt(1)
             case _ => 0
           }
           buffer += obtainKey(regDef, group, cursor.getInt(0))
@@ -567,7 +562,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
   }
 
-  override def getKeysFor(registerDefinition: RegisterDefinition): Set[Key] = {
+  override def getKeysFor(registerDefinition: RegisterDefinition[Register]): Set[Key] = {
     val db = getReadableDatabase
     try {
       keysFor(db, registerDefinition)
@@ -601,7 +596,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
   }
 
-  private def existReference(db :SQLiteDatabase, key: Key, referencerRegDef: RegisterDefinition, referencerFieldDef: ForeignKeyFieldDefinition): Boolean = {
+  private def existReference(db :SQLiteDatabase, key: Key, referencerRegDef: RegisterDefinition[Register], referencerFieldDef: ForeignKeyFieldDefinition): Boolean = {
     val whereClause = s"${fieldName(referencerRegDef, referencerFieldDef)}=${key.index}"
     val cursor = db.query(tableName(referencerRegDef), Array(SQLiteStorageManager.idKey), whereClause, null, null, null, null, null)
 
@@ -644,7 +639,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
   }
 
-  override def getKeysForCollection(registerDefinition: CollectibleRegisterDefinition, id: CollectionId): Set[Key] = {
+  override def getKeysForCollection(registerDefinition: CollectibleRegisterDefinition[Register], id: CollectionId): Set[Key] = {
     val db = getReadableDatabase
     try {
       val whereClause = s"${SQLiteStorageManager.collKey}=$id"

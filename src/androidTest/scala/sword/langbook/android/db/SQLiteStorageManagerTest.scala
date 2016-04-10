@@ -4,10 +4,12 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.test.InstrumentationTestCase
 import junit.framework.Assert
+import sword.db.Register.CollectionId
+import sword.db.StorageManager.Key
 import sword.db._
 
 class NoInitializedSqliteStorageManager(context :Context, dbName: String,
-    registerDefinitions :Seq[RegisterDefinition]) extends SQLiteStorageManager(context, dbName,
+    registerDefinitions :Seq[RegisterDefinition[Register]]) extends SQLiteStorageManager(context, dbName,
     registerDefinitions) {
 
   override def initializeDatabase(db: SQLiteDatabase): Unit = {}
@@ -22,31 +24,59 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
 
   val testDbName = "testDb"
 
-  val numRegDef = new CollectibleRegisterDefinition {
+  val numRegDef = new CollectibleRegisterDefinition[numReg] {
     override val fields = List(UnicodeFieldDefinition)
+    override def from(values: Seq[String],
+        keyExtractor: FieldDefinition => String => Option[Key]): Option[numReg] = {
+      if (values.size == 1) {
+        try {
+          Some(numReg(values.head.toInt))
+        }
+        catch {
+          case _: NumberFormatException => None
+        }
+      }
+      else None
+    }
   }
 
   val numRegFieldValue = 0x40
 
-  val numReg = new Register {
-    override val fields = List(UnicodeField(numRegFieldValue))
+  case class numReg(value: Int) extends Register {
+    override val fields = List(UnicodeField(value))
     override val definition = numRegDef
+  }
+
+  val numRegInstance = numReg(numRegFieldValue)
+
+  case class numRegForeignKeyField(key: StorageManager.Key) extends ForeignKeyField {
+    override val definition = numRegForeignKeyFieldDef
   }
 
   val numRegForeignKeyFieldDef = new ForeignKeyFieldDefinition {
     override val target = numRegDef
+    override def from(value: String, keyExtractor: String => Option[StorageManager.Key]) = {
+      keyExtractor(value).map(numRegForeignKeyField)
+    }
   }
 
-  val numRegRefRegDef = new RegisterDefinition {
+  val numRegRefRegDef = new RegisterDefinition[numRegRefReg] {
     override val fields = List(numRegForeignKeyFieldDef)
+    override def from(values: Seq[String],
+        keyExtractor: FieldDefinition => String => Option[Key]): Option[numRegRefReg] = {
+      if (values.size == 1) keyExtractor(numRegForeignKeyFieldDef)(values.head).map(numRegRefReg)
+      else None
+    }
+  }
+
+  case class numRegRefReg(key: StorageManager.Key) extends Register {
+    override val fields = List(numRegForeignKeyField(key))
+    override val definition = numRegRefRegDef
   }
 
   val numRegCollRefFieldDef = new CollectionReferenceFieldDefinition {
     override val target = numRegDef
-  }
-
-  val numRegCollRefRegDef = new RegisterDefinition {
-    override val fields = List(numRegCollRefFieldDef)
+    override protected def from: (CollectionId) => CollectionReferenceField = ???
   }
 
   class NumRegister(value :Int) extends Register {
@@ -54,7 +84,7 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
     override val definition = numRegDef
   }
 
-  def newStorageManager(registerDefinitions: Seq[RegisterDefinition]) = {
+  def newStorageManager(registerDefinitions: Seq[RegisterDefinition[Register]]) = {
     val context = getInstrumentation.getTargetContext
     context.deleteDatabase(testDbName)
     new NoInitializedSqliteStorageManager(context, testDbName, registerDefinitions)
@@ -62,7 +92,7 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
 
   def testAlwaysClean(): Unit = {
     val manager1 = newStorageManager(List(numRegDef))
-    val encodedKey = manager1.insert(numReg).get.encoded
+    val encodedKey = manager1.insert(numRegInstance).get.encoded
 
     val manager2 = newStorageManager(List(numRegDef))
     val key = manager2.decode(encodedKey).get
@@ -106,6 +136,12 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
   }
 
   def testThrowIfExistingRegisterDefinitionWithOuterCollectionReference(): Unit = {
+    val numRegCollRefRegDef = new RegisterDefinition[Register] {
+      override val fields = List(numRegCollRefFieldDef)
+      override def from(values: Seq[String],
+        keyExtractor: FieldDefinition => String => Option[Key]): Option[Register] = ???
+    }
+
     ensureIllegalArgumentExceptionThrown {
       newStorageManager(List(numRegCollRefRegDef))
     }
@@ -134,31 +170,31 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
 
   def testInsertAndRetrieveRegisterWithGivenIdentifier(): Unit = {
     val storageManager = newStorageManager(List(numRegDef))
-    val key = assertDefined(storageManager.insert(numReg))
+    val key = assertDefined(storageManager.insert(numRegInstance))
     val reg = assertDefined(storageManager.get(key))
-    assertEquals(numReg, reg)
+    assertEquals(numRegInstance, reg)
   }
 
   def testReturnValueMoreThanOnceForTheSameKey(): Unit = {
     val storageManager = newStorageManager(List(numRegDef))
-    val key = assertDefined(storageManager.insert(numReg))
+    val key = assertDefined(storageManager.insert(numRegInstance))
 
     val reg1 = assertDefined(storageManager.get(key))
-    assertEquals(numReg, reg1)
+    assertEquals(numRegInstance, reg1)
 
     val reg2 = assertDefined(storageManager.get(key))
-    assertEquals(numReg, reg2)
+    assertEquals(numRegInstance, reg2)
   }
 
   def testInsertAndDeleteRegisterWithGivenIdentifier(): Unit = {
     val storageManager = newStorageManager(List(numRegDef))
-    val key = assertDefined(storageManager.insert(numReg))
+    val key = assertDefined(storageManager.insert(numRegInstance))
     assertTrue(storageManager.delete(key))
   }
 
   def testNotDeleteMoreThanOnceForTheSameKey(): Unit = {
     val storageManager = newStorageManager(List(numRegDef))
-    val key = assertDefined(storageManager.insert(numReg))
+    val key = assertDefined(storageManager.insert(numRegInstance))
     assertTrue(storageManager.delete(key))
     assertFalse(storageManager.delete(key))
   }
@@ -166,7 +202,7 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
   def testNotAcceptKeysGeneratedByAnotherStorageManagerInstance(): Unit = {
     val storageManagerA = newStorageManager(List(numRegDef))
     val storageManagerB = newStorageManager(List(numRegDef))
-    val key = assertDefined(storageManagerA.insert(numReg))
+    val key = assertDefined(storageManagerA.insert(numRegInstance))
 
     ensureIllegalArgumentExceptionThrown {
       storageManagerB.get(key)
@@ -175,32 +211,18 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
 
   def testCannotInsertARegisterPointingToNothing(): Unit = {
     val storageManager = newStorageManager(List(numRegDef, numRegRefRegDef))
-    val numRegKey = assertDefined(storageManager.insert(numReg))
+    val numRegKey = assertDefined(storageManager.insert(numRegInstance))
     assertTrue(storageManager.delete(numRegKey))
 
-    val reg2 = new Register {
-      override val fields = List(new ForeignKeyField {
-        override val key = numRegKey
-        override val definition = numRegForeignKeyFieldDef
-      })
-      override val definition = numRegRefRegDef
-    }
-
+    val reg2 = numRegRefReg(numRegKey)
     assertEmpty(storageManager.insert(reg2))
   }
 
   def testCannotDeleteRegisterPointedByAnother(): Unit = {
     val storageManager = newStorageManager(List(numRegDef, numRegRefRegDef))
-    val insertedKey = assertDefined(storageManager.insert(numReg))
+    val insertedKey = assertDefined(storageManager.insert(numRegInstance))
 
-    val reg2 = new Register {
-      override val fields = List(new ForeignKeyField {
-        override val key = insertedKey
-        override val definition = numRegForeignKeyFieldDef
-      })
-      override val definition = numRegRefRegDef
-    }
-
+    val reg2 = numRegRefReg(insertedKey)
     val key2 = assertDefined(storageManager.insert(reg2))
 
     assertFalse(storageManager.delete(insertedKey))
@@ -266,8 +288,10 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
   }
 
   def testThrowUnsupportedOperationExceptionOnInsertingCollectionForNonCollectibleRegisters(): Unit = {
-    val myRegDef = new RegisterDefinition {
+    val myRegDef = new RegisterDefinition[Register] {
       override val fields = List(UnicodeFieldDefinition)
+      override def from(values: Seq[String],
+        keyExtractor: FieldDefinition => String => Option[Key]): Option[Register] = ???
     }
 
     val manager = newStorageManager(List(myRegDef))
@@ -289,8 +313,10 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
   }
 
   def testThrowUnsupportedOperationExceptionOnInsertingCollectionWithDifferentCollectibleRegistersDefinitions(): Unit = {
-    val myRegDef = new CollectibleRegisterDefinition {
+    val myRegDef = new CollectibleRegisterDefinition[Register] {
       override val fields = List(UnicodeFieldDefinition)
+      override def from(values: Seq[String],
+        keyExtractor: FieldDefinition => String => Option[Key]): Option[Register] = ???
     }
 
     val manager = newStorageManager(List(numRegDef, myRegDef))
@@ -318,7 +344,7 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
 
   def testReturnJustTheKeyForTheInsertedRegister(): Unit = {
     val manager = newStorageManager(List(numRegDef))
-    val key = assertDefined(manager.insert(numReg))
+    val key = assertDefined(manager.insert(numRegInstance))
 
     assertEquals(1, manager.getKeysFor(numRegDef).size)
     assertTrue(manager.getKeysFor(numRegDef).contains(key))
@@ -326,8 +352,8 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
 
   def testReturnJustKeysForInsertedRegisters(): Unit = {
     val manager = newStorageManager(List(numRegDef))
-    val key1 = assertDefined(manager.insert(numReg))
-    val key2 = assertDefined(manager.insert(numReg))
+    val key1 = assertDefined(manager.insert(numRegInstance))
+    val key2 = assertDefined(manager.insert(numRegInstance))
 
     assertEquals(2, manager.getKeysFor(numRegDef).size)
     assertTrue(manager.getKeysFor(numRegDef) contains key1)
@@ -336,13 +362,13 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
 
   def testReplaceOneRegisterByAnotherWithSameDefinition(): Unit = {
     val storageManager = newStorageManager(List(numRegDef))
-    val key = assertDefined(storageManager.insert(numReg))
+    val key = assertDefined(storageManager.insert(numRegInstance))
 
     val regB = new Register {
       override val fields = List(UnicodeField(numRegFieldValue + 1))
       override val definition = numRegDef
     }
-    assertFalse(numReg == regB)
+    assertFalse(numRegInstance == regB)
     assertTrue(storageManager.replace(regB, key))
 
     val reg = assertDefined(storageManager.get(key))
@@ -351,13 +377,13 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
 
   def testNotReplaceRegisterWhenKeyNotDefinedPreviously(): Unit = {
     val storageManager = newStorageManager(List(numRegDef))
-    val key = assertDefined(storageManager.insert(numReg))
+    val key = assertDefined(storageManager.insert(numRegInstance))
 
     val regB = new Register {
       override val fields = List(UnicodeField(numRegFieldValue + 1))
       override val definition = numRegDef
     }
-    assertFalse(numReg == regB)
+    assertFalse(numRegInstance == regB)
 
     assertTrue(storageManager.delete(key))
     assertFalse(storageManager.replace(regB, key))
@@ -423,13 +449,13 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
 
   def testReturnKeysContainingSameStorageManagerInstance(): Unit = {
     val manager = newStorageManager(List(numRegDef))
-    val key = assertDefined(manager.insert(numReg))
+    val key = assertDefined(manager.insert(numRegInstance))
     assertEquals(manager, key.storageManager)
   }
 
   def testEncodeKeyAndDecodeItBack(): Unit = {
     val manager = newStorageManager(List(numRegDef))
-    val key = assertDefined(manager.insert(numReg))
+    val key = assertDefined(manager.insert(numRegInstance))
 
     val str = manager.encode(key)
     val newKey = assertDefined(manager.decode(str))
@@ -438,7 +464,7 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
 
   def testEncodeKeyAndDecodeItFromAnotherInstanceWithSameTypeAndConfiguration() = {
     val managerA = newStorageManager(List(numRegDef))
-    val keyA = assertDefined(managerA.insert(numReg))
+    val keyA = assertDefined(managerA.insert(numRegInstance))
 
     val str = managerA.encode(keyA)
 
