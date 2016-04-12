@@ -1,19 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
+<TextView
     xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/selectorEntryContainer"
+    android:id="@+id/selectorEntry"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:minHeight="@dimen/selectorEntryMinHeight"
+    android:paddingStart="@dimen/selectorEntryHorizontalPadding"
+    android:paddingEnd="@dimen/selectorEntryHorizontalPadding"
     android:gravity="center_vertical"
-    android:background="@drawable/selector_entry_background">
-
-    <View
-        android:layout_width="1px"
-        android:layout_height="@dimen/selectorEntryMinHeight"/>
-
-    <TextView
-        android:id="@+id/selectorEntryCaption"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"/>
-
-</LinearLayout>
+    android:background="@drawable/selector_entry_background"/>

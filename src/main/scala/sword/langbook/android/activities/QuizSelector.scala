@@ -4,11 +4,9 @@ import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.view.{LayoutInflater, ViewGroup, View}
-import android.widget.{Toast, AdapterView, BaseAdapter}
-import sword.db.Register
-import sword.langbook.db.{Language, Word, Alphabet}
+import android.widget.{AdapterView, BaseAdapter}
+import sword.langbook.db.{Language, Alphabet}
 import sword.langbook.{TranslationQuestion, SynonymQuestion, InterAlphabetQuestion}
-import sword.langbook.android.db.SQLiteStorageManager
 import sword.langbook.android.{TR, R}
 import sword.langbook.android.TypedResource._
 
@@ -76,10 +74,12 @@ class QuizSelector extends BaseActivity with AdapterView.OnItemClickListener {
     override val getCount = quizNames.size
 
     override def getView(position: Int, convertView: View, parent: ViewGroup): View = {
-      val view = if (convertView != null) convertView
-      else LayoutInflater.from(parent.getContext).inflate(R.layout.selector_entry, parent, false)
+      val view = {
+        if (convertView != null) convertView
+        else LayoutInflater.from(parent.getContext).inflate(R.layout.selector_entry, parent, false)
+      }
 
-      view.findView(TR.selectorEntryCaption).setText(quizNames(position))
+      view.findView(TR.selectorEntry).setText(quizNames(position))
       view
     }
 

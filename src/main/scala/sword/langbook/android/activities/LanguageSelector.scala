@@ -41,9 +41,8 @@ class LanguageSelector extends BaseActivity with Toolbar.OnMenuItemClickListener
       val view = if (convertView != null) convertView
       else LayoutInflater.from(parent.getContext).inflate(R.layout.selector_entry, parent, false)
 
-      items(position).suitableTextForLanguage(preferredLanguage).foreach { text =>
-        view.findView(TR.selectorEntryCaption).setText(text)
-      }
+      val text = items(position).suitableTextForLanguage(preferredLanguage).getOrElse("")
+      view.findView(TR.selectorEntry).setText(text)
       view
     }
   }

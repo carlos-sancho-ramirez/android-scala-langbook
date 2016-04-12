@@ -36,11 +36,12 @@ class Selector extends BaseActivity with AdapterView.OnItemClickListener with Se
     override def getItem(position: Int) = items(position)
 
     override def getView(position: Int, convertView: View, parent: ViewGroup) = {
-      val view = if (convertView != null) convertView
-      else LayoutInflater.from(parent.getContext).inflate(R.layout.selector_entry, parent, false)
-      val word = items(position)
-      val text = word.text.getOrElse(word.language.preferredAlphabet, "")
-      view.findView(TR.selectorEntryCaption).setText(text)
+      val view = {
+        if (convertView != null) convertView
+        else LayoutInflater.from(parent.getContext).inflate(R.layout.selector_entry, parent, false)
+      }
+      val text = items(position).suitableText.getOrElse("")
+      view.findView(TR.selectorEntry).setText(text)
       view
     }
   }
