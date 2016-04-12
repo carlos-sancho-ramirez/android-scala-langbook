@@ -3,9 +3,9 @@ package sword.langbook.android.activities
 import android.app.Activity
 import android.support.v7.widget.RecyclerView
 import android.view.{View, ViewGroup}
-import sword.langbook.db.Word
+import sword.langbook.db.{Language, Word}
 
-case class WordDetailsAdapter(activity: Activity, alphabets: IndexedSeq[String], language: String,
+case class WordDetailsAdapter(activity: BaseActivity, alphabets: IndexedSeq[String], language: Language,
     acceptations: IndexedSeq[String], synonyms: IndexedSeq[Word], translations: IndexedSeq[Word])
     extends RecyclerView.Adapter[WordDetailsViewHolder] {
 
@@ -110,8 +110,13 @@ case class WordDetailsAdapter(activity: Activity, alphabets: IndexedSeq[String],
             holder.textView.setClickable(false)
             alphabets(relPosition)
           case sectionTitles.language =>
-            holder.textView.setClickable(false)
-            language
+            holder.textView.setClickable(true)
+            holder.textView.setOnClickListener(new View.OnClickListener() {
+              override def onClick(v: View): Unit = {
+                LanguageDetails.openWith(activity, language = language)
+              }
+            })
+            language.suitableTextForLanguage(activity.preferredLanguage).getOrElse("")
           case sectionTitles.acceptations =>
             holder.textView.setClickable(false)
             acceptations(relPosition)

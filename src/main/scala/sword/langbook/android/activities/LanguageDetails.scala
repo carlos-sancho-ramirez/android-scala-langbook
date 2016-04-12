@@ -5,15 +5,19 @@ import android.content.Intent
 import android.os.Bundle
 import android.support.v7.widget.LinearLayoutManager
 import sword.langbook.android.{TR, R}
-import sword.langbook.db.{Language, Word}
+import sword.langbook.db.Language
 
 object LanguageDetails {
   private val className = "sword.langbook.android.activities.LanguageDetails"
 
-  def openWith(activity :Activity, requestCode :Int = 0, languageEncodedKey: String = null) = {
+  def openWith(activity :Activity, requestCode :Int = 0, language: Language = null, languageEncodedKey: String = null) = {
     val intent = new Intent()
     intent.setClassName(activity, className)
-    intent.putExtra(BundleKeys.languageKey, languageEncodedKey)
+    val languageEncoded = {
+      if (language != null) language.key.encoded
+      else languageEncodedKey
+    }
+    intent.putExtra(BundleKeys.languageKey, languageEncoded)
 
     if (requestCode > 0) activity.startActivityForResult(intent, requestCode)
     else activity.startActivity(intent)

@@ -45,34 +45,24 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
   }
 
   def updateAdapter(): Unit = {
-    var alphabetStrings = Vector[String]()
-    var languageText = ""
-    var acceptations = Vector[String]()
-    var synonyms = Vector[Word]()
-    var translations = Vector[Word]()
-
     for (word <- wordOption) {
       val language = word.language
 
-      alphabetStrings = word.text.flatMap {
+      val alphabetStrings = word.text.flatMap {
         case (alphabet, thisText) =>
           alphabet.suitableTextForLanguage(preferredLanguage).map(alphabetText => s"$alphabetText: $thisText")
       }.toVector
 
-      for (text <- language.suitableTextForLanguage(preferredLanguage)) {
-        languageText = text
-      }
-
-      acceptations = word.concepts.flatMap(_.isTypeOf)
+      val acceptations = word.concepts.flatMap(_.isTypeOf)
           .flatMap(_.wordsForLanguage(preferredLanguage).headOption)
           .flatMap(_.suitableText).toVector
 
-      synonyms = word.synonyms.toVector
-      translations = word.translations.toVector
-    }
+      val synonyms = word.synonyms.toVector
+      val translations = word.translations.toVector
 
-    findView(TR.recyclerView).setAdapter(new WordDetailsAdapter(this, alphabetStrings,
-        languageText, acceptations, synonyms, translations))
+      findView(TR.recyclerView).setAdapter(new WordDetailsAdapter(this, alphabetStrings, language,
+        acceptations, synonyms, translations))
+    }
   }
 
   def updateMenu(menu :Menu) = {
