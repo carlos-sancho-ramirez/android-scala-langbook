@@ -7,6 +7,6 @@
     <dimen name="descriptionHeaderVerticalPadding">8dp</dimen>
     <dimen name="descriptionHeaderHorizontalPadding">8dp</dimen>
 
-    <dimen name="alphabetDetailsSymbolSide">120dp</dimen>
-    <dimen name="alphabetDetailsSymbolText">24sp</dimen>
+    <dimen name="alphabetDetailsSymbolSide">90sp</dimen>
+    <dimen name="alphabetDetailsSymbolText">32sp</dimen>
 </resources>
