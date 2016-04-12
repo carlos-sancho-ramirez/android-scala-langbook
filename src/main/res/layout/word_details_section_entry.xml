@@ -8,4 +8,4 @@
     android:paddingStart="@dimen/selectorEntryHorizontalPadding"
     android:paddingEnd="@dimen/selectorEntryHorizontalPadding"
     android:gravity="center_vertical"
-    android:background="@drawable/selector_entry_background"/>
+    android:background="?attr/selectableItemBackground"/>
