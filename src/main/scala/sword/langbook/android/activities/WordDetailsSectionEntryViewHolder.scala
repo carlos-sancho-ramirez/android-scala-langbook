@@ -1,13 +1,11 @@
 package sword.langbook.android.activities
 
 import android.view.{LayoutInflater, ViewGroup}
-import android.widget.LinearLayout
+import android.widget.{TextView, LinearLayout}
 import sword.langbook.android.TR
 import sword.langbook.android.TypedResource._
 
-case class WordDetailsSectionEntryViewHolder(linearLayout: LinearLayout) extends WordDetailsViewHolder(linearLayout) {
-  val textView = linearLayout.findView(TR.selectorEntryCaption)
-}
+case class WordDetailsSectionEntryViewHolder(textView: TextView) extends WordDetailsViewHolder(textView)
 
 object WordDetailsSectionEntryViewHolder {
   def newInstance(parent: ViewGroup) = {

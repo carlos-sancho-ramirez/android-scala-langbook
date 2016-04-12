@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <dimen name="selectorEntryHorizontalPadding">8dp</dimen>
     <dimen name="selectorEntryMinHeight">8mm</dimen>
 
     <dimen name="sectionHeaderDividerWidth">4dp</dimen>

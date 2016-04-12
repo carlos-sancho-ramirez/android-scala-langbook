@@ -107,18 +107,18 @@ case class WordDetailsAdapter(activity: Activity, alphabets: IndexedSeq[String],
 
         val text = currentSection match {
           case sectionTitles.alphabets =>
-            holder.linearLayout.setClickable(false)
+            holder.textView.setClickable(false)
             alphabets(relPosition)
           case sectionTitles.language =>
-            holder.linearLayout.setClickable(false)
+            holder.textView.setClickable(false)
             language
           case sectionTitles.acceptations =>
-            holder.linearLayout.setClickable(false)
+            holder.textView.setClickable(false)
             acceptations(relPosition)
           case sectionTitles.synonyms =>
             val synonym = synonyms(relPosition)
-            holder.linearLayout.setClickable(true)
-            holder.linearLayout.setOnClickListener(new View.OnClickListener() {
+            holder.textView.setClickable(true)
+            holder.textView.setOnClickListener(new View.OnClickListener() {
               override def onClick(v: View): Unit = {
                 WordDetails.openWith(activity, RequestCodes.checkWordDetails, synonym)
               }
@@ -126,8 +126,8 @@ case class WordDetailsAdapter(activity: Activity, alphabets: IndexedSeq[String],
             synonym.suitableText.getOrElse("")
           case sectionTitles.translations =>
             val translation = translations(relPosition)
-            holder.linearLayout.setClickable(true)
-            holder.linearLayout.setOnClickListener(new View.OnClickListener() {
+            holder.textView.setClickable(true)
+            holder.textView.setOnClickListener(new View.OnClickListener() {
               override def onClick(v: View): Unit = {
                 WordDetails.openWith(activity, RequestCodes.checkWordDetails, translation)
               }
