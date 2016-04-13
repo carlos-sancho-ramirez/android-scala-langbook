@@ -6,5 +6,6 @@ object BundleKeys {
   val conceptKeys = "cks"
   val excludedLanguageKey = "elk"
   val languageKey = "lk"
+  val symbolKey = "sk"
   val wordKey = "wk"
 }

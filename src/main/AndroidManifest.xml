@@ -22,6 +22,7 @@
 
         <activity android:name=".activities.LanguageDetails"/>
         <activity android:name=".activities.AlphabetDetails"/>
+        <activity android:name=".activities.SymbolDetails"/>
 
         <activity
             android:name=".activities.Main"

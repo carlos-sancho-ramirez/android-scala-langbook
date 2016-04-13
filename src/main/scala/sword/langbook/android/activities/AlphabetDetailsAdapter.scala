@@ -3,7 +3,8 @@ package sword.langbook.android.activities
 import android.app.Activity
 import android.support.v7.widget.RecyclerView
 import android.util.DisplayMetrics
-import android.view.ViewGroup
+import android.view.View.OnClickListener
+import android.view.{View, ViewGroup}
 import sword.langbook.android.R
 import sword.langbook.db.Alphabet
 
@@ -14,12 +15,13 @@ object AlphabetDetailsAdapter {
     activity.getWindowManager.getDefaultDisplay.getMetrics(metrics)
 
     val columns = metrics.widthPixels / activity.getResources.getDimensionPixelSize(R.dimen.alphabetDetailsSymbolSide)
-    new AlphabetDetailsAdapter(alphabet, columns)
+    new AlphabetDetailsAdapter(activity, alphabet, columns)
   }
 }
 
-class AlphabetDetailsAdapter(val alphabet: Alphabet, val spanCount: Int) extends RecyclerView.Adapter[SymbolViewHolder] {
-  val symbols = alphabet.symbols.map(_.unicode.toChar).toVector
+case class AlphabetDetailsAdapter(activity: Activity, alphabet: Alphabet, spanCount: Int) extends RecyclerView.Adapter[SymbolViewHolder] {
+  val symbols = alphabet.symbols.toVector
+  val chars = symbols.map(_.unicode.toChar)
   override val getItemCount = symbols.size
 
   override def onCreateViewHolder(viewGroup: ViewGroup, viewType: Int) = {
@@ -27,6 +29,11 @@ class AlphabetDetailsAdapter(val alphabet: Alphabet, val spanCount: Int) extends
   }
 
   override def onBindViewHolder(vh: SymbolViewHolder, position: Int): Unit = {
-    vh.textView.setText("" + symbols(position))
+    vh.textView.setText("" + chars(position))
+    vh.textView.setOnClickListener(new OnClickListener {
+      override def onClick(v: View): Unit = {
+        SymbolDetails.openWith(activity, symbol = symbols(position))
+      }
+    })
   }
 }
