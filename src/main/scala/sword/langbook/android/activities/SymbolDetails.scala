@@ -37,7 +37,7 @@ class SymbolDetails extends BaseActivity {
     toolBar.setTitle(title)
 
     for (symbol <- symbolOption) {
-      findView(TR.recyclerView).setAdapter(new SymbolDetailsAdapter(symbol))
+      findView(TR.recyclerView).setAdapter(new SymbolDetailsAdapter(this, symbol))
     }
   }
 }
