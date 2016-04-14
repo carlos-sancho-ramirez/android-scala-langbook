@@ -5,5 +5,6 @@ object RequestCodes {
   val checkWordDetails = 2
   val pickConceptsForSynonym = 3
   val pickConceptsForTranslation = 4
-  val pickLanguage = 5
+  val pickFile = 5
+  val pickLanguage = 6
 }

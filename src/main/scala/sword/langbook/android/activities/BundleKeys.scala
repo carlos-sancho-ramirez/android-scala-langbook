@@ -5,6 +5,7 @@ object BundleKeys {
   val conceptKey = "ck"
   val conceptKeys = "cks"
   val excludedLanguageKey = "elk"
+  val filePath = "fp"
   val languageKey = "lk"
   val symbolKey = "sk"
   val wordKey = "wk"

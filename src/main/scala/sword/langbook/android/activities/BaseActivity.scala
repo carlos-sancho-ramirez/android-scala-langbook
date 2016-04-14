@@ -2,6 +2,7 @@ package sword.langbook.android.activities
 
 import java.util.Locale
 
+import android.content.Intent
 import android.support.v7.app.AppCompatActivity
 import sword.langbook.android.{LangbookApplication, TypedFindView}
 import sword.langbook.db.LinkedStorageManager
@@ -31,5 +32,13 @@ class BaseActivity extends AppCompatActivity with TypedFindView {
       val english = languages.find(_.code == Locale.ENGLISH.getLanguage)
       english.getOrElse(languages.head)
     }
+  }
+
+  /**
+   * This is just here to force onActivityResult to be public. Then fragments can call it when
+   * finishing.
+   */
+  override def onActivityResult(requestCode: Int, resultCode: Int, data: Intent) = {
+    super.onActivityResult(requestCode, resultCode, data)
   }
 }

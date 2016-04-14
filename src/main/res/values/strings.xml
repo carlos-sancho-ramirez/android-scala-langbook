@@ -44,6 +44,10 @@
     <string name="settingsDatabaseImportButton">Import</string>
     <string name="settingsDatabaseExportButton">Export</string>
 
+    <!-- file path dialog -->
+    <string name="filePathDialogTitle">Enter the file path</string>
+    <string name="filePathDialogOkButton">OK</string>
+
     <!-- Warning messages -->
     <string name="oneFieldRequired">Please fill at least one of the fields first</string>
     <string name="unsupportedFeature">Unsupported feature</string>

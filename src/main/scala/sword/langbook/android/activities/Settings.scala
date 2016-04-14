@@ -28,7 +28,7 @@ class Settings extends BaseActivity {
 
     findViewById(R.id.importDatabaseButton).setOnClickListener(new OnClickListener {
       override def onClick(v: View): Unit = {
-        Toast.makeText(Settings.this, getString(R.string.unsupportedFeature), Toast.LENGTH_SHORT).show()
+        FilePathDialog.openWith(Settings.this, RequestCodes.pickFile)
       }
     })
 
@@ -37,5 +37,12 @@ class Settings extends BaseActivity {
         Toast.makeText(Settings.this, getString(R.string.unsupportedFeature), Toast.LENGTH_SHORT).show()
       }
     })
+  }
+
+  override def onActivityResult(requestCode: Int, resultCode: Int, data: Intent) = {
+    if (resultCode == Activity.RESULT_OK && requestCode == RequestCodes.pickFile) {
+      val path = data.getStringExtra(BundleKeys.filePath)
+      Toast.makeText(this, s"Should import from $path", Toast.LENGTH_SHORT).show()
+    }
   }
 }
