@@ -10,6 +10,7 @@
     <string name="checkLanguagesButton">Languages</string>
     <string name="checkWordsButton">Dictionary</string>
     <string name="startQuizButton">Evaluate yourself</string>
+    <string name="settingsButton">Settings</string>
 
     <!-- Section headers -->
     <string name="alphabetsWhereIncluded">Alphabets where included</string>
@@ -37,6 +38,13 @@
     <string name="deleteWordsOption">Delete words</string>
     <string name="continueOption">Continue</string>
 
+    <!-- Settings activity -->
+    <string name="settingsDatabaseSection">Database</string>
+    <string name="settingsDatabaseInfo">Using SQLite3 database</string>
+    <string name="settingsDatabaseImportButton">Import</string>
+    <string name="settingsDatabaseExportButton">Export</string>
+
     <!-- Warning messages -->
     <string name="oneFieldRequired">Please fill at least one of the fields first</string>
+    <string name="unsupportedFeature">Unsupported feature</string>
 </resources>

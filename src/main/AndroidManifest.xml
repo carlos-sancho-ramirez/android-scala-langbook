@@ -52,5 +52,6 @@
 
         <activity android:name=".activities.QuizSelector"/>
         <activity android:name=".activities.Question"/>
+        <activity android:name=".activities.Settings"/>
     </application>
 </manifest>
