@@ -10,4 +10,6 @@
 
     <dimen name="alphabetDetailsSymbolSide">90sp</dimen>
     <dimen name="alphabetDetailsSymbolText">32sp</dimen>
+
+    <dimen name="filePathDialogHorizontalPadding">20dp</dimen>
 </resources>

@@ -56,13 +56,14 @@ class Settings extends BaseActivity {
   override def onActivityResult(requestCode: Int, resultCode: Int, data: Intent) = {
     if (resultCode == Activity.RESULT_OK) {
       if (requestCode == RequestCodes.pickFileRead || requestCode == RequestCodes.pickFileWrite) {
+        val uri = {
+          if (data != null) data.getData
+          else null
+        }
+
         val path = {
-          if (data.hasExtra(BundleKeys.filePath)) data.getStringExtra(BundleKeys.filePath)
-          else {
-            val uri = data.getData
-            if (uri != null) uri.getPath
-            else null
-          }
+          if (uri != null) uri.getPath
+          else null
         }
 
         val message = {

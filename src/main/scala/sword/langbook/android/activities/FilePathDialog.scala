@@ -2,6 +2,7 @@ package sword.langbook.android.activities
 
 import android.app.Activity
 import android.content.{Intent, DialogInterface}
+import android.net.Uri
 import android.os.Bundle
 import android.support.v4.app.DialogFragment
 import android.support.v7.app.AlertDialog
@@ -50,7 +51,8 @@ class FilePathDialog extends DialogFragment with DialogInterface.OnClickListener
         .setCancelable(true)
         .create()
 
-    _editText = LayoutInflater.from(alertDialog.getContext).inflate(TR.layout.file_path_dialog)
+    val root = LayoutInflater.from(alertDialog.getContext).inflate(TR.layout.file_path_dialog)
+    _editText = root.findView(TR.pathField)
     if (savedInstanceState != null) {
       val text = savedInstanceState.getString(FilePathDialog.SaveBundleKeys.path)
       if (text != null) {
@@ -58,7 +60,7 @@ class FilePathDialog extends DialogFragment with DialogInterface.OnClickListener
       }
     }
 
-    alertDialog.setView(_editText)
+    alertDialog.setView(root)
     alertDialog
   }
 
@@ -75,7 +77,7 @@ class FilePathDialog extends DialogFragment with DialogInterface.OnClickListener
         updatePathVariable()
         if (_path != null) {
           val data = new Intent()
-          data.putExtra(BundleKeys.filePath, _path)
+          data.setData(Uri.parse("file://" + _path))
           activity.onActivityResult(_requestCode, Activity.RESULT_OK, data)
         }
       case _ =>
