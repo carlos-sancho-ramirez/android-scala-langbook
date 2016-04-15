@@ -32,32 +32,37 @@ class Settings extends BaseActivity {
 
     findViewById(R.id.importDatabaseButton).setOnClickListener(new OnClickListener {
       override def onClick(v: View): Unit = {
-        FilePathDialog.openWith(Settings.this, RequestCodes.pickFile)
+        FilePathDialog.openWith(Settings.this, RequestCodes.pickFileRead)
       }
     })
 
     findViewById(R.id.exportDatabaseButton).setOnClickListener(new OnClickListener {
       override def onClick(v: View): Unit = {
-        Toast.makeText(Settings.this, getString(R.string.unsupportedFeature), Toast.LENGTH_SHORT).show()
+        FilePathDialog.openWith(Settings.this, RequestCodes.pickFileWrite)
       }
     })
   }
 
   override def onActivityResult(requestCode: Int, resultCode: Int, data: Intent) = {
-    if (resultCode == Activity.RESULT_OK && requestCode == RequestCodes.pickFile) {
-      val path = data.getStringExtra(BundleKeys.filePath)
-      val message = {
-        if (importDatabaseFromPath(path)) R.string.databaseImportSuccess
-        else R.string.databaseImportFailure
+    if (resultCode == Activity.RESULT_OK) {
+      if (requestCode == RequestCodes.pickFileRead || requestCode == RequestCodes.pickFileWrite) {
+        val path = data.getStringExtra(BundleKeys.filePath)
+        val message = {
+          if (requestCode == RequestCodes.pickFileRead) {
+            if (importDatabaseFromPath(path)) R.string.databaseImportSuccess
+            else R.string.databaseImportFailure
+          }
+          else { // Assumed requestCode == RequestCodes.pickFileWrite
+            if (exportDatabaseFromPath(path)) R.string.databaseExportSuccess
+            else R.string.databaseExportFailure
+          }
+        }
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
       }
-      Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
   }
 
-  private def importDatabaseFromPath(path: String): Boolean = {
-    val inFile = new File(path)
-    val outFile = getDatabasePath(SQLiteStorageManager.dbName)
-
+  private def copyFiles(inFile: File, outFile: File) = {
     try {
       val inStream = new FileInputStream(inFile)
 
@@ -95,5 +100,17 @@ class Settings extends BaseActivity {
         // Nothing can be done
         false
     }
+  }
+
+  private def importDatabaseFromPath(path: String): Boolean = {
+    val inFile = new File(path)
+    val outFile = getDatabasePath(SQLiteStorageManager.dbName)
+    copyFiles(inFile, outFile)
+  }
+
+  private def exportDatabaseFromPath(path: String): Boolean = {
+    val inFile = getDatabasePath(SQLiteStorageManager.dbName)
+    val outFile = new File(path)
+    copyFiles(inFile, outFile)
   }
 }
