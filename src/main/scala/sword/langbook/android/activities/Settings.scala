@@ -26,18 +26,28 @@ object Settings {
 
 class Settings extends BaseActivity {
 
+  private def pickFile(): Unit = {
+    val requestCode = RequestCodes.pickFileRead
+    val intent = new Intent(Intent.ACTION_GET_CONTENT)
+    intent.setType("file/*")
+    if (getPackageManager.queryIntentActivities(intent, 0).isEmpty) {
+      FilePathDialog.openWith(Settings.this, requestCode)
+    }
+    else {
+      startActivityForResult(intent, requestCode)
+    }
+  }
+
   override def onCreate(savedInstanceState :Bundle) :Unit = {
     super.onCreate(savedInstanceState)
     setContentView(R.layout.settings)
 
     findViewById(R.id.importDatabaseButton).setOnClickListener(new OnClickListener {
-      override def onClick(v: View): Unit = {
-        FilePathDialog.openWith(Settings.this, RequestCodes.pickFileRead)
-      }
+      override def onClick(v: View) = pickFile()
     })
 
     findViewById(R.id.exportDatabaseButton).setOnClickListener(new OnClickListener {
-      override def onClick(v: View): Unit = {
+      override def onClick(v: View) = {
         FilePathDialog.openWith(Settings.this, RequestCodes.pickFileWrite)
       }
     })
@@ -46,7 +56,15 @@ class Settings extends BaseActivity {
   override def onActivityResult(requestCode: Int, resultCode: Int, data: Intent) = {
     if (resultCode == Activity.RESULT_OK) {
       if (requestCode == RequestCodes.pickFileRead || requestCode == RequestCodes.pickFileWrite) {
-        val path = data.getStringExtra(BundleKeys.filePath)
+        val path = {
+          if (data.hasExtra(BundleKeys.filePath)) data.getStringExtra(BundleKeys.filePath)
+          else {
+            val uri = data.getData
+            if (uri != null) uri.getPath
+            else null
+          }
+        }
+
         val message = {
           if (requestCode == RequestCodes.pickFileRead) {
             if (importDatabaseFromPath(path)) R.string.databaseImportSuccess
@@ -103,14 +121,18 @@ class Settings extends BaseActivity {
   }
 
   private def importDatabaseFromPath(path: String): Boolean = {
-    val inFile = new File(path)
-    val outFile = getDatabasePath(SQLiteStorageManager.dbName)
-    copyFiles(inFile, outFile)
+    path != null && {
+      val inFile = new File(path)
+      val outFile = getDatabasePath(SQLiteStorageManager.dbName)
+      copyFiles(inFile, outFile)
+    }
   }
 
   private def exportDatabaseFromPath(path: String): Boolean = {
-    val inFile = getDatabasePath(SQLiteStorageManager.dbName)
-    val outFile = new File(path)
-    copyFiles(inFile, outFile)
+    path != null && {
+      val inFile = getDatabasePath(SQLiteStorageManager.dbName)
+      val outFile = new File(path)
+      copyFiles(inFile, outFile)
+    }
   }
 }
