@@ -808,4 +808,35 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
       db.close()
     }
   }
+
+  private def getArray[R <: Register](db: SQLiteDatabase, regDef: ArrayableRegisterDefinition[R], id: Register.CollectionId) :Seq[R] = {
+
+    val orderClause = s"${SQLiteStorageManager.idKey} ASC"
+    val selection = Array(SQLiteStorageManager.idKey) ++ regDef.fields.map(fieldName(regDef, _))
+    val cursor = db.query(tableName(regDef), selection, s"${SQLiteStorageManager.collKey}=$id",
+        null, null, null, orderClause, null)
+
+    if (cursor == null) Seq()
+    else try {
+      if (cursor.getCount <= 0 || !cursor.moveToFirst()) Seq()
+      else {
+        val buffer = scala.collection.mutable.ListBuffer[R]()
+        do {
+          buffer += fromCursor(regDef, cursor)
+        } while(cursor.moveToNext())
+        buffer.toList
+      }
+    } finally {
+      cursor.close()
+    }
+  }
+
+  override def getArray[R <: Register](registerDefinition: ArrayableRegisterDefinition[R], id: Register.CollectionId) :Seq[R] = {
+    val db = getReadableDatabase
+    try {
+      getArray(db, registerDefinition, id)
+    } finally {
+      db.close()
+    }
+  }
 }
