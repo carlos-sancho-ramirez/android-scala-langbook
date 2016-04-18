@@ -11,7 +11,7 @@ for the Langbook platform independent code.
 
 ## How to build and run this project
 
-This project uses the [Android SDK Plugin for SBT](https://github.com/pfn/android-sdk-plugin)
+This project uses the [Android SDK Plugin for SBT](https://github.com/scala-android/sbt-android)
 to simplify the build process. Please follow the previous link for further details on it.
 
 In short, follow the following steps to start:
