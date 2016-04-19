@@ -5,10 +5,11 @@ import android.support.v7.widget.RecyclerView
 import android.view.ViewGroup
 import android.widget.{Toast, CompoundButton}
 import sword.langbook.android.R
+import sword.langbook.android.viewholders._
 
 import scala.collection.mutable
 
-case class ConceptPickerAdapter(activity: Activity, concepts: Seq[String]) extends RecyclerView.Adapter[ConceptPickerViewHolder] with CompoundButton.OnCheckedChangeListener {
+case class ConceptPickerAdapter(activity: Activity, concepts: Seq[String]) extends RecyclerView.Adapter[BaseViewHolder] with CompoundButton.OnCheckedChangeListener {
   val descriptionHeaderText = activity.getString(R.string.conceptPickerDescriptionHeader)
   override val getItemCount = concepts.size + 1
 
@@ -20,29 +21,24 @@ case class ConceptPickerAdapter(activity: Activity, concepts: Seq[String]) exten
 
   def selected = _selected.toSet
 
-  object ViewTypes {
-    val header = 0
-    val entry = 1
-  }
-
   override def getItemViewType(position: Int) = {
-    if (position == 0) ViewTypes.header
-    else ViewTypes.entry
+    if (position == 0) BaseViewHolder.types.descriptionHeader
+    else BaseViewHolder.types.checkableEntry
   }
 
-  override def onCreateViewHolder(viewGroup: ViewGroup, viewType: Int): ConceptPickerViewHolder = {
+  override def onCreateViewHolder(viewGroup: ViewGroup, viewType: Int): BaseViewHolder = {
     viewType match {
-      case ViewTypes.header => ConceptPickerHeaderViewHolder.newInstance(viewGroup)
-      case ViewTypes.entry => ConceptPickerEntryViewHolder.newInstance(viewGroup)
+      case BaseViewHolder.types.`descriptionHeader` => DescriptionHeaderViewHolder.newInstance(viewGroup)
+      case BaseViewHolder.types.`checkableEntry` => CheckableEntryViewHolder.newInstance(viewGroup)
     }
   }
 
-  override def onBindViewHolder(vh: ConceptPickerViewHolder, position: Int): Unit = {
+  override def onBindViewHolder(vh: BaseViewHolder, position: Int): Unit = {
     vh match {
-      case holder: ConceptPickerHeaderViewHolder =>
+      case holder: DescriptionHeaderViewHolder =>
         holder.textView.setText(descriptionHeaderText)
 
-      case holder: ConceptPickerEntryViewHolder =>
+      case holder: CheckableEntryViewHolder =>
         holder.textView.setText(concepts(position - 1))
 
         val checkBox = holder.checkBox

@@ -6,6 +6,7 @@ import android.util.DisplayMetrics
 import android.view.View.OnClickListener
 import android.view.{View, ViewGroup}
 import sword.langbook.android.R
+import sword.langbook.android.viewholders.SymbolViewHolder
 import sword.langbook.db.Alphabet
 
 object AlphabetDetailsAdapter {

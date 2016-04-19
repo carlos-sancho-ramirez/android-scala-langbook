@@ -3,33 +3,29 @@ package sword.langbook.android.activities
 import android.app.Activity
 import android.support.v7.widget.RecyclerView
 import android.view.{View, ViewGroup}
+import sword.langbook.android.viewholders._
 import sword.langbook.db.{Language, Alphabet}
 
 case class LanguageDetailsAdapter(activity: Activity, preferredLanguage: Language, topText: String,
-    alphabets: Vector[Alphabet]) extends RecyclerView.Adapter[WordDetailsViewHolder] with View.OnClickListener {
-
-  object ViewTypes {
-    val header = 0
-    val entry = 1
-  }
+    alphabets: Vector[Alphabet]) extends RecyclerView.Adapter[BaseViewHolder] with View.OnClickListener {
 
   override def getItemViewType(position: Int) = {
-    if (position == 1) ViewTypes.header
-    else ViewTypes.entry
+    if (position == 1) BaseViewHolder.types.sectionHeader
+    else BaseViewHolder.types.sectionEntry
   }
 
   val alphabetPositionOffset = 2
   override val getItemCount = alphabets.size + alphabetPositionOffset
-  override def onCreateViewHolder(viewGroup: ViewGroup, viewType: Int): WordDetailsViewHolder = {
+  override def onCreateViewHolder(viewGroup: ViewGroup, viewType: Int): BaseViewHolder = {
     viewType match {
-      case ViewTypes.header => WordDetailsSectionHeaderViewHolder.newInstance(viewGroup)
-      case ViewTypes.entry => WordDetailsSectionEntryViewHolder.newInstance(viewGroup)
+      case BaseViewHolder.types.`sectionHeader` => SectionHeaderViewHolder.newInstance(viewGroup)
+      case BaseViewHolder.types.`sectionEntry` => SectionEntryViewHolder.newInstance(viewGroup)
     }
   }
 
-  override def onBindViewHolder(vh: WordDetailsViewHolder, position: Int): Unit = {
+  override def onBindViewHolder(vh: BaseViewHolder, position: Int): Unit = {
     vh match {
-      case holder: WordDetailsSectionEntryViewHolder =>
+      case holder: SectionEntryViewHolder =>
         val text = {
           if (position == 0) topText
           else alphabets(position - alphabetPositionOffset).suitableTextForLanguage(preferredLanguage).getOrElse("")
@@ -38,7 +34,7 @@ case class LanguageDetailsAdapter(activity: Activity, preferredLanguage: Languag
         textView.setText(text)
         textView.setOnClickListener(this)
         textView.setTag(position)
-      case holder: WordDetailsSectionHeaderViewHolder =>
+      case holder: SectionHeaderViewHolder =>
         holder.textView.setText("Alphabets")
     }
   }

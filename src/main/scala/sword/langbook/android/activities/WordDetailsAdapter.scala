@@ -1,13 +1,13 @@
 package sword.langbook.android.activities
 
-import android.app.Activity
 import android.support.v7.widget.RecyclerView
 import android.view.{View, ViewGroup}
+import sword.langbook.android.viewholders._
 import sword.langbook.db.{Language, Word}
 
 case class WordDetailsAdapter(activity: BaseActivity, alphabets: IndexedSeq[String], language: Language,
     acceptations: IndexedSeq[String], synonyms: IndexedSeq[Word], translations: IndexedSeq[Word])
-    extends RecyclerView.Adapter[WordDetailsViewHolder] {
+    extends RecyclerView.Adapter[BaseViewHolder] {
 
   val alphabetsSectionCount = {
     val size = alphabets.size
@@ -79,28 +79,23 @@ case class WordDetailsAdapter(activity: BaseActivity, alphabets: IndexedSeq[Stri
       acceptationsSectionCount
   }
 
-  object ViewTypes {
-    val header = 0
-    val entry = 1
-  }
-
   override def getItemViewType(position: Int) = {
-    if (sectionHeaderPositions.contains(position)) ViewTypes.header
-    else ViewTypes.entry
+    if (sectionHeaderPositions.contains(position)) BaseViewHolder.types.sectionHeader
+    else BaseViewHolder.types.sectionEntry
   }
 
-  override def onCreateViewHolder(viewGroup: ViewGroup, viewType: Int): WordDetailsViewHolder = {
+  override def onCreateViewHolder(viewGroup: ViewGroup, viewType: Int): BaseViewHolder = {
     viewType match {
-      case ViewTypes.header => WordDetailsSectionHeaderViewHolder.newInstance(viewGroup)
-      case ViewTypes.entry => WordDetailsSectionEntryViewHolder.newInstance(viewGroup)
+      case BaseViewHolder.types.`sectionHeader` => SectionHeaderViewHolder.newInstance(viewGroup)
+      case BaseViewHolder.types.`sectionEntry` => SectionEntryViewHolder.newInstance(viewGroup)
     }
   }
 
-  override def onBindViewHolder(vh: WordDetailsViewHolder, position: Int): Unit = {
+  override def onBindViewHolder(vh: BaseViewHolder, position: Int): Unit = {
     vh match {
-      case holder: WordDetailsSectionHeaderViewHolder =>
+      case holder: SectionHeaderViewHolder =>
         holder.textView.setText(sectionHeaderPositions(position))
-      case holder: WordDetailsSectionEntryViewHolder =>
+      case holder: SectionEntryViewHolder =>
         val currentHeaderPosition = sectionHeaderPositions.keys.filter(_ < position).max
         val currentSection = sectionHeaderPositions(currentHeaderPosition)
         val relPosition = position - currentHeaderPosition - 1

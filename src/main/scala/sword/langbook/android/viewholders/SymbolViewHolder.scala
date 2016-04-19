@@ -1,4 +1,4 @@
-package sword.langbook.android.activities
+package sword.langbook.android.viewholders
 
 import android.support.v7.widget.RecyclerView
 import android.view.{LayoutInflater, ViewGroup}
