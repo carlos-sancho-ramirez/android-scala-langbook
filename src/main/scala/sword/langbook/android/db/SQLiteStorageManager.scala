@@ -6,7 +6,6 @@ import android.database.sqlite.{SQLiteDatabase, SQLiteOpenHelper}
 import android.util.Log
 import sword.db.Register.CollectionId
 import sword.db._
-import sword.langbook.db.registers.WordConcept
 
 import scala.collection.mutable.ListBuffer
 
@@ -683,6 +682,47 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val db = getReadableDatabase
     try {
       keysFor(db, registerDefinition)
+    } finally {
+      db.close()
+    }
+  }
+
+  private def keysFor(db :SQLiteDatabase, regDef :RegisterDefinition[Register], filter: ForeignKeyField) :Set[Key] = {
+    val array = regDef match {
+      case _: CollectibleRegisterDefinition[_] =>
+        Array(SQLiteStorageManager.idKey, SQLiteStorageManager.collKey)
+      case _ =>
+        Array(SQLiteStorageManager.idKey)
+    }
+
+    val whereClause = s"${fieldName(regDef, filter)}=${filter.key.index}"
+    val cursor = db.query(tableName(regDef), array, whereClause, null, null, null, null, null)
+
+    if (cursor == null) Set()
+    else try {
+      if (cursor.getCount <= 0 || !cursor.moveToFirst()) Set()
+      else {
+        val buffer = new ListBuffer[Key]()
+        do {
+          val group = regDef match {
+            case _: CollectibleRegisterDefinition[_] => cursor.getInt(1)
+            case _ => 0
+          }
+          buffer += obtainKey(regDef, group, cursor.getInt(0))
+        } while(cursor.moveToNext())
+        val result = buffer.result().toSet
+        logi(s"Called keysFor and returning $result")
+        result
+      }
+    } finally {
+      cursor.close()
+    }
+  }
+
+  override def getKeysFor(registerDefinition: RegisterDefinition[Register], filter: ForeignKeyField): Set[Key] = {
+    val db = getReadableDatabase
+    try {
+      keysFor(db, registerDefinition, filter)
     } finally {
       db.close()
     }

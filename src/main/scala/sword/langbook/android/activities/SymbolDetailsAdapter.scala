@@ -1,6 +1,5 @@
 package sword.langbook.android.activities
 
-import android.app.Activity
 import android.support.v7.widget.RecyclerView
 import android.view.View.OnClickListener
 import android.view.{View, ViewGroup}
