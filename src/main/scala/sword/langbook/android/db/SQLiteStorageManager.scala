@@ -435,15 +435,6 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
   }
 
-  override def getMapFor[R <: Register](registerDefinition: RegisterDefinition[R], filter: ForeignKeyField): scala.collection.Map[Key, R] = {
-    val db = getReadableDatabase
-    try {
-      getMapFor(db, registerDefinition, filter)
-    } finally {
-      db.close()
-    }
-  }
-
   private def getMapForCollection[R <: Register](db: SQLiteDatabase,
       registerDefinition: CollectibleRegisterDefinition[R], id: CollectionId): Map[Key, R] = {
     val keys = Seq(SQLiteStorageManager.idKey) ++ registerDefinition.fields.map(fieldName(registerDefinition,_))
@@ -466,15 +457,6 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
 
     result.toMap
-  }
-
-  override def getMapForCollection[R <: Register](registerDefinition: CollectibleRegisterDefinition[R], id: CollectionId): Map[Key, R] = {
-    val db = getReadableDatabase
-    try {
-      getMapForCollection(db, registerDefinition, id)
-    } finally {
-      db.close()
-    }
   }
 
   private def keyExtractor(fieldDef: FieldDefinition)(value: String): Option[Key] = {
@@ -508,19 +490,6 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
       else Some(fromCursor(regDef, cursor))
     } finally {
       cursor.close()
-    }
-  }
-
-  override def get(key :Key) = {
-    if (key.storageManager != this) {
-      throw new IllegalArgumentException("This key do not belong to this storage manager")
-    }
-
-    val db = getReadableDatabase
-    try {
-      get(db, key)
-    } finally {
-      db.close()
     }
   }
 
@@ -589,25 +558,6 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     db.execSQL(query)
   }
 
-  override def insert(collectionId :Register.CollectionId, register :Register) = {
-    val db = getWritableDatabase
-    try {
-      insert(db, collectionId, register)
-      find(db, register).lastOption
-    } finally {
-      db.close()
-    }
-  }
-
-  override def insert(register: Register): Option[Key] = {
-    val db = getWritableDatabase
-    try {
-      insert(db, register)
-    } finally {
-      db.close()
-    }
-  }
-
   private def insert(db: SQLiteDatabase, registers: Traversable[Register]): Option[CollectionId] = {
     var collId = 1
     val cursor = db.query(tableName(registers.head.definition), Array(SQLiteStorageManager.collKey),
@@ -628,24 +578,6 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
       insert(db, collId, register)
     }
     Some(collId)
-  }
-
-  override def insert(registers: Traversable[Register]): Option[CollectionId] = {
-    val definitions = registers.map(_.definition).toSet
-    if (definitions.size != 1) {
-      throw new UnsupportedOperationException("Unable to insert collections for registers with different definitions")
-    }
-
-    if (!definitions.head.isInstanceOf[CollectibleRegisterDefinition[_]]) {
-      throw new UnsupportedOperationException("Unable to insert collections for non-collectible registers")
-    }
-
-    val db = getWritableDatabase
-    try {
-      insert(db, registers)
-    } finally {
-      db.close()
-    }
   }
 
   private def keysFor(db :SQLiteDatabase, regDef :RegisterDefinition[Register]) :Set[Key] = {
@@ -675,15 +607,6 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
       }
     } finally {
       cursor.close()
-    }
-  }
-
-  override def getKeysFor(registerDefinition: RegisterDefinition[Register]): Set[Key] = {
-    val db = getReadableDatabase
-    try {
-      keysFor(db, registerDefinition)
-    } finally {
-      db.close()
     }
   }
 
@@ -719,15 +642,6 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
   }
 
-  override def getKeysFor(registerDefinition: RegisterDefinition[Register], filter: ForeignKeyField): Set[Key] = {
-    val db = getReadableDatabase
-    try {
-      keysFor(db, registerDefinition, filter)
-    } finally {
-      db.close()
-    }
-  }
-
   private def replace(db: SQLiteDatabase, register: Register, key: Key): Boolean = {
     val currentOption = get(db, key)
     if (currentOption.isDefined) {
@@ -742,15 +656,6 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
       true
     }
     else false
-  }
-
-  override def replace(register: Register, key: Key): Boolean = {
-    val db = getWritableDatabase
-    try {
-      replace(db, register, key)
-    } finally {
-      db.close()
-    }
   }
 
   private def existReference(db :SQLiteDatabase, key: Key, referencerRegDef: RegisterDefinition[Register], referencerFieldDef: ForeignKeyFieldDefinition): Boolean = {
@@ -787,36 +692,22 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     else false
   }
 
-  override def delete(key: Key): Boolean = {
-    val db = getWritableDatabase
-    try {
-      delete(db, key)
-    } finally {
-      db.close()
-    }
-  }
+  private def getKeysForCollection(db: SQLiteDatabase, registerDefinition: CollectibleRegisterDefinition[Register], id: CollectionId): Set[Key] = {
+    val whereClause = s"${SQLiteStorageManager.collKey}=$id"
+    val cursor = db.query(tableName(registerDefinition), Array(SQLiteStorageManager.idKey), whereClause, null, null, null, null, null)
 
-  override def getKeysForCollection(registerDefinition: CollectibleRegisterDefinition[Register], id: CollectionId): Set[Key] = {
-    val db = getReadableDatabase
-    try {
-      val whereClause = s"${SQLiteStorageManager.collKey}=$id"
-      val cursor = db.query(tableName(registerDefinition), Array(SQLiteStorageManager.idKey), whereClause, null, null, null, null, null)
-
-      if (cursor == null) Set()
-      else try {
-        if (cursor.getCount <= 0 || !cursor.moveToFirst()) Set()
-        else {
-          val set = scala.collection.mutable.Set[Key]()
-          do {
-            set += obtainKey(registerDefinition, id, cursor.getInt(0))
-          } while(cursor.moveToNext())
-          set.toSet
-        }
-      } finally {
-        cursor.close()
+    if (cursor == null) Set()
+    else try {
+      if (cursor.getCount <= 0 || !cursor.moveToFirst()) Set()
+      else {
+        val set = scala.collection.mutable.Set[Key]()
+        do {
+          set += obtainKey(registerDefinition, id, cursor.getInt(0))
+        } while(cursor.moveToNext())
+        set.toSet
       }
     } finally {
-      db.close()
+      cursor.close()
     }
   }
 
@@ -837,15 +728,6 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
       }
     } finally {
       cursor.close()
-    }
-  }
-
-  override def getKeysForArray(registerDefinition: ArrayableRegisterDefinition[Register], id: Register.CollectionId) :Seq[Key] = {
-    val db = getReadableDatabase
-    try {
-      getKeysForArray(db, registerDefinition, id)
-    } finally {
-      db.close()
     }
   }
 
@@ -871,12 +753,89 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
   }
 
-  override def getArray[R <: Register](registerDefinition: ArrayableRegisterDefinition[R], id: Register.CollectionId) :Seq[R] = {
+  private def withReadableDatabase[T](f: SQLiteDatabase => T): T = {
     val db = getReadableDatabase
     try {
-      getArray(db, registerDefinition, id)
+      f(db)
     } finally {
       db.close()
     }
+  }
+
+  private def withWritableDatabase[T](f: SQLiteDatabase => T): T = {
+    val db = getWritableDatabase
+    try {
+      f(db)
+    } finally {
+      db.close()
+    }
+  }
+
+  override def get(key :Key) = {
+    if (key.storageManager != this) {
+      throw new IllegalArgumentException("This key do not belong to this storage manager")
+    }
+
+    withReadableDatabase(get(_, key))
+  }
+
+  override def insert(register: Register): Option[Key] = {
+    withWritableDatabase(insert(_, register))
+  }
+
+  override def insert(collectionId :Register.CollectionId, register :Register) = {
+    withWritableDatabase { db =>
+      insert(db, collectionId, register)
+      find(db, register).lastOption
+    }
+  }
+
+  override def insert(registers: Traversable[Register]): Option[CollectionId] = {
+    val definitions = registers.map(_.definition).toSet
+    if (definitions.size != 1) {
+      throw new UnsupportedOperationException("Unable to insert collections for registers with different definitions")
+    }
+
+    if (!definitions.head.isInstanceOf[CollectibleRegisterDefinition[_]]) {
+      throw new UnsupportedOperationException("Unable to insert collections for non-collectible registers")
+    }
+
+    withWritableDatabase(insert(_, registers))
+  }
+
+  override def delete(key: Key): Boolean = {
+    withWritableDatabase(delete(_, key))
+  }
+
+  override def replace(register: Register, key: Key): Boolean = {
+    withWritableDatabase(replace(_, register, key))
+  }
+
+  override def getKeysFor(registerDefinition: RegisterDefinition[Register]): Set[Key] = {
+    withReadableDatabase(keysFor(_, registerDefinition))
+  }
+
+  override def getKeysFor(registerDefinition: RegisterDefinition[Register], filter: ForeignKeyField): Set[Key] = {
+    withReadableDatabase(keysFor(_, registerDefinition, filter))
+  }
+
+  override def getKeysForCollection(registerDefinition: CollectibleRegisterDefinition[Register], id: CollectionId): Set[Key] = {
+    withReadableDatabase(getKeysForCollection(_, registerDefinition, id))
+  }
+
+  override def getKeysForArray(registerDefinition: ArrayableRegisterDefinition[Register], id: Register.CollectionId) :Seq[Key] = {
+    withReadableDatabase(getKeysForArray(_, registerDefinition, id))
+  }
+
+  override def getMapFor[R <: Register](registerDefinition: RegisterDefinition[R], filter: ForeignKeyField): scala.collection.Map[Key, R] = {
+    withReadableDatabase(getMapFor(_, registerDefinition, filter))
+  }
+
+  override def getMapForCollection[R <: Register](registerDefinition: CollectibleRegisterDefinition[R], id: CollectionId): Map[Key, R] = {
+    withReadableDatabase(getMapForCollection(_, registerDefinition, id))
+  }
+
+  override def getArray[R <: Register](registerDefinition: ArrayableRegisterDefinition[R], id: Register.CollectionId) :Seq[R] = {
+    withReadableDatabase(getArray(_, registerDefinition, id))
   }
 }
