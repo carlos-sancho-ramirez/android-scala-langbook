@@ -36,6 +36,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     with StorageManager {
 
   // The following code is copied from AbstractStorageManager, and it should be centralised
+  // The following code is copied from AbstractStorageManager, and it should be centralised
   // TODO: Centralise this code
   if (registerDefinitions.toSet.size < registerDefinitions.size) {
     throw new IllegalArgumentException("Duplicated register definitions are not allowed")
@@ -68,6 +69,27 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
   private def logi(message :String) = android.util.Log.i("DB", message)
 
+  private def query(db: SQLiteDatabase, tableName: String, columns: Array[String], whereClause: String, orderByClause: String) = {
+
+    val logWhere = {
+      if (whereClause != null) s" WHERE $whereClause"
+      else ""
+    }
+
+    val logOrder = {
+      if (orderByClause != null) s" ORDER BY $orderByClause"
+      else ""
+    }
+
+    logi(s"Executing query: SELECT ${columns.mkString(", ")} FROM $tableName$logWhere$logOrder")
+    db.query(tableName, columns, whereClause, null, null, null, orderByClause, null)
+  }
+
+  private def exec(db: SQLiteDatabase, query: String): Unit = {
+    logi(s"Executing query: $query")
+    db.execSQL(query)
+  }
+
   private def tableName(regDef :RegisterDefinition[Register]) :String = s"R${registerDefinitions.indexOf(regDef)}"
   private def tableName(reg :Register) :String = tableName(reg.definition)
 
@@ -91,9 +113,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
         case _ => fields
       }).mkString(", ")
 
-      val query = s"CREATE TABLE IF NOT EXISTS ${tableName(regDef)} ($idKey INTEGER PRIMARY KEY AUTOINCREMENT, $columns)"
-      logi(s"Executing SQLite query: $query")
-      db.execSQL(query)
+      exec(db, s"CREATE TABLE IF NOT EXISTS ${tableName(regDef)} ($idKey INTEGER PRIMARY KEY AUTOINCREMENT, $columns)")
     }
   }
 
@@ -296,8 +316,8 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   private def fromDbVersion3(db: SQLiteDatabase): Unit = {
     import sword.langbook.db.registers
 
-    val cursor = db.query("WordRegister", Array("mWrittenWord", "mPronunciation", "meaning"),
-      null, null, null, null, null, null)
+    val cursor = query(db, "WordRegister", Array("mWrittenWord", "mPronunciation", "meaning"),
+      null, null)
 
     if (cursor != null) try {
       if (cursor.getCount > 0 && cursor.moveToFirst()) {
@@ -412,7 +432,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }) ++ regDef.fields.map(fieldName(regDef,_))
 
     val whereClause = s"${fieldName(regDef, filter)}=${filter.key.index}"
-    val cursor = db.query(tableName(regDef), array, whereClause, null, null, null, null, null)
+    val cursor = query(db, tableName(regDef), array, whereClause, null)
 
     if (cursor == null) Map()
     else try {
@@ -438,8 +458,8 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   private def getMapForCollection[R <: Register](db: SQLiteDatabase,
       registerDefinition: CollectibleRegisterDefinition[R], id: CollectionId): Map[Key, R] = {
     val keys = Seq(SQLiteStorageManager.idKey) ++ registerDefinition.fields.map(fieldName(registerDefinition,_))
-    val cursor = db.query(tableName(registerDefinition), keys.toArray,
-      s"${SQLiteStorageManager.collKey}=${id.toString}", null, null, null, null, null)
+    val cursor = query(db, tableName(registerDefinition), keys.toArray,
+      s"${SQLiteStorageManager.collKey}=${id.toString}", null)
 
     val result = scala.collection.mutable.Map[Key, R]()
     if (cursor != null) {
@@ -481,8 +501,8 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
   private def get(db :SQLiteDatabase, key: Key): Option[Register] = {
     val regDef = key.registerDefinition
-    val cursor = db.query(tableName(regDef), regDef.fields.map(fieldName(regDef,_)).toArray,
-      s"${SQLiteStorageManager.idKey}=?", Array(key.index.toString), null, null, null, null)
+    val cursor = query(db, tableName(regDef), regDef.fields.map(fieldName(regDef,_)).toArray,
+      s"${SQLiteStorageManager.idKey}=${key.index}", null)
 
     if (cursor == null) None
     else try {
@@ -512,7 +532,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val whereClause = reg.fields.map { field =>
       s"${fieldName(regDef, field)}=${sqlValue(field)}"
     }.mkString(" AND ")
-    val cursor = db.query(tableName(regDef), Array(SQLiteStorageManager.idKey), whereClause, null, null, null, null, null)
+    val cursor = query(db, tableName(regDef), Array(SQLiteStorageManager.idKey), whereClause, null)
 
     if (cursor == null) Nil
     else try {
@@ -541,9 +561,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
       val regDef = register.definition
       val keys = regDef.fields.map(fieldName(regDef, _)).mkString(", ")
       val values = register.fields.map(sqlValue).mkString(", ")
-      val query = s"INSERT INTO ${tableName(register)} ($keys) VALUES ($values)"
-      logi(s"Executing query: $query")
-      db.execSQL(query)
+      exec(db, s"INSERT INTO ${tableName(register)} ($keys) VALUES ($values)")
       find(db, register).lastOption
     }
     else None
@@ -553,15 +571,13 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val regDef = register.definition
     val keys = regDef.fields.map(fieldName(regDef,_)).mkString(", ")
     val values = register.fields.map(sqlValue).mkString(", ")
-    val query = s"INSERT INTO ${tableName(register)} (${SQLiteStorageManager.collKey}, $keys) VALUES ($coll, $values)"
-    logi(s"Executing query: $query")
-    db.execSQL(query)
+    exec(db, s"INSERT INTO ${tableName(register)} (${SQLiteStorageManager.collKey}, $keys) VALUES ($coll, $values)")
   }
 
   private def insert(db: SQLiteDatabase, registers: Traversable[Register]): Option[CollectionId] = {
     var collId = 1
-    val cursor = db.query(tableName(registers.head.definition), Array(SQLiteStorageManager.collKey),
-        null, null, null, null, null, null)
+    val cursor = query(db, tableName(registers.head.definition), Array(SQLiteStorageManager.collKey),
+        null, null)
 
     if (cursor != null) try {
       if (cursor.getCount > 0 && cursor.moveToFirst()) {
@@ -588,7 +604,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
         Array(SQLiteStorageManager.idKey)
     }
 
-    val cursor = db.query(tableName(regDef), array, whereClause, null, null, null, null, null)
+    val cursor = query(db, tableName(regDef), array, whereClause, null)
 
     if (cursor == null) Set()
     else try {
@@ -622,11 +638,9 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     if (currentOption.isDefined) {
       val expr = register.fields.map(f => s"${fieldName(register.definition, f)}=${sqlValue(f)}")
         .mkString(", ")
-      val query = s"UPDATE ${tableName(key.registerDefinition)} SET $expr WHERE ${
+      exec(db, s"UPDATE ${tableName(key.registerDefinition)} SET $expr WHERE ${
         SQLiteStorageManager.idKey
-      }=${key.index}"
-      logi(s"Executing query: $query")
-      db.execSQL(query)
+      }=${key.index}")
 
       true
     }
@@ -635,7 +649,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
   private def existReference(db :SQLiteDatabase, key: Key, referencerRegDef: RegisterDefinition[Register], referencerFieldDef: ForeignKeyFieldDefinition): Boolean = {
     val whereClause = s"${fieldName(referencerRegDef, referencerFieldDef)}=${key.index}"
-    val cursor = db.query(tableName(referencerRegDef), Array(SQLiteStorageManager.idKey), whereClause, null, null, null, null, null)
+    val cursor = query(db, tableName(referencerRegDef), Array(SQLiteStorageManager.idKey), whereClause, null)
 
     if (cursor == null) false
     else try {
@@ -657,11 +671,10 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
   private def delete(db: SQLiteDatabase, key: Key): Boolean = {
     if (get(db, key).isDefined && !isReferenced(db, key)) {
-      val query = s"DELETE FROM ${tableName(key.registerDefinition)} WHERE ${
+      exec(db, s"DELETE FROM ${tableName(key.registerDefinition)} WHERE ${
         SQLiteStorageManager.idKey
-      }=${key.index}"
-      logi(s"Executing query: $query")
-      db.execSQL(query)
+      }=${key.index}")
+
       true
     }
     else false
@@ -669,7 +682,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
   private def getKeysForCollection(db: SQLiteDatabase, registerDefinition: CollectibleRegisterDefinition[Register], id: CollectionId): Set[Key] = {
     val whereClause = s"${SQLiteStorageManager.collKey}=$id"
-    val cursor = db.query(tableName(registerDefinition), Array(SQLiteStorageManager.idKey), whereClause, null, null, null, null, null)
+    val cursor = query(db, tableName(registerDefinition), Array(SQLiteStorageManager.idKey), whereClause, null)
 
     if (cursor == null) Set()
     else try {
@@ -689,7 +702,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   private def getKeysForArray(db: SQLiteDatabase, registerDefinition: ArrayableRegisterDefinition[Register], id: Register.CollectionId) :Seq[Key] = {
     val whereClause = s"${SQLiteStorageManager.collKey}=$id"
     val orderClause = s"${SQLiteStorageManager.idKey} ASC"
-    val cursor = db.query(tableName(registerDefinition), Array(SQLiteStorageManager.idKey), whereClause, null, null, null, orderClause, null)
+    val cursor = query(db, tableName(registerDefinition), Array(SQLiteStorageManager.idKey), whereClause, orderClause)
 
     if (cursor == null) Seq()
     else try {
@@ -710,8 +723,8 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
     val orderClause = s"${SQLiteStorageManager.idKey} ASC"
     val selection = Array(SQLiteStorageManager.idKey) ++ regDef.fields.map(fieldName(regDef, _))
-    val cursor = db.query(tableName(regDef), selection, s"${SQLiteStorageManager.collKey}=$id",
-        null, null, null, orderClause, null)
+    val cursor = query(db, tableName(regDef), selection, s"${SQLiteStorageManager.collKey}=$id",
+        orderClause)
 
     if (cursor == null) Seq()
     else try {
