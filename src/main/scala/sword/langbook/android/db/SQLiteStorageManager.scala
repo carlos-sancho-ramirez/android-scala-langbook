@@ -746,8 +746,13 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
       if (cursor.getCount <= 0 || !cursor.moveToFirst()) Seq()
       else {
         val buffer = scala.collection.mutable.ListBuffer[R]()
+        val fieldIndexes = for (fieldDef <- regDef.fields) yield {
+          cursor.getColumnIndex(fieldName(regDef, fieldDef))
+        }
+
         do {
-          buffer += fromCursor(regDef, cursor)
+          val fieldValues = fieldIndexes.map(cursor.getString)
+          buffer += regDef.from(fieldValues, keyExtractor).get
         } while(cursor.moveToNext())
         buffer.toList
       }
