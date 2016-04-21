@@ -35,6 +35,9 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     extends SQLiteOpenHelper(context, dbName, null, SQLiteStorageManager.currentDbVersion)
     with StorageManager {
 
+  // Just to measure time taken
+  var _lastQueryMillis: Long = 0
+
   // The following code is copied from AbstractStorageManager, and it should be centralised
   // The following code is copied from AbstractStorageManager, and it should be centralised
   // TODO: Centralise this code
@@ -82,12 +85,24 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
 
     logi(s"Executing query: SELECT ${columns.mkString(", ")} FROM $tableName$logWhere$logOrder")
-    db.query(tableName, columns, whereClause, null, null, null, orderByClause, null)
+    val startQueryTime = System.currentTimeMillis
+    try {
+      db.query(tableName, columns, whereClause, null, null, null, orderByClause, null)
+    }
+    finally {
+      _lastQueryMillis = System.currentTimeMillis - startQueryTime
+    }
   }
 
   private def exec(db: SQLiteDatabase, query: String): Unit = {
     logi(s"Executing query: $query")
-    db.execSQL(query)
+    val startQueryTime = System.currentTimeMillis
+    try {
+      db.execSQL(query)
+    }
+    finally {
+      _lastQueryMillis = System.currentTimeMillis - startQueryTime
+    }
   }
 
   private def tableName(regDef :RegisterDefinition[Register]) :String = s"R${registerDefinitions.indexOf(regDef)}"
@@ -743,19 +758,29 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
   private def withReadableDatabase[T](f: SQLiteDatabase => T): T = {
     val db = getReadableDatabase
+    val startingTimeMillis = System.currentTimeMillis
+
     try {
       f(db)
     } finally {
       db.close()
+
+      val timeMillis = System.currentTimeMillis - startingTimeMillis
+      logi(s"Database query took ${_lastQueryMillis}. Whole operation took $timeMillis milliseconds")
     }
   }
 
   private def withWritableDatabase[T](f: SQLiteDatabase => T): T = {
     val db = getWritableDatabase
+    val startingTimeMillis = System.currentTimeMillis
+
     try {
       f(db)
     } finally {
       db.close()
+
+      val timeMillis = System.currentTimeMillis - startingTimeMillis
+      logi(s"Database query took ${_lastQueryMillis}. Whole operation took $timeMillis milliseconds")
     }
   }
 
