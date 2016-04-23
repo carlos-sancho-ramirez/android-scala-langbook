@@ -37,6 +37,7 @@
     <string name="newWordOption">New word</string>
     <string name="deleteWordsOption">Delete words</string>
     <string name="continueOption">Continue</string>
+    <string name="searchOption">Search word</string>
 
     <!-- Settings activity -->
     <string name="settingsDatabaseSection">Database</string>

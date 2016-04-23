@@ -4,6 +4,13 @@
     xmlns:app="http://schemas.android.com/apk/res-auto" >
 
     <item
+        android:id="@+id/searchOption"
+        app:showAsAction="ifRoom|collapseActionView"
+        android:icon="@android:drawable/ic_menu_search"
+        app:actionViewClass="android.support.v7.widget.SearchView"
+        android:title="@string/searchOption"/>
+
+    <item
         android:id="@+id/newWordOption"
         android:orderInCategory="1"
         app:showAsAction="never"

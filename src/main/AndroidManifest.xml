@@ -39,7 +39,16 @@
 
         <activity
             android:name=".activities.Selector"
-            android:label="@string/appName"/>
+            android:label="@string/appName">
+
+            <intent-filter>
+                <action android:name="android.intent.action.SEARCH" />
+            </intent-filter>
+            <meta-data
+                android:name="android.app.searchable"
+                android:resource="@xml/searchable"/>
+
+        </activity>
 
         <activity
             android:name=".activities.WordDetails"

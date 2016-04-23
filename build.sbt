@@ -19,5 +19,6 @@ lazy val generic = (project in file("generic"))
 sourceDirectories in Android := Seq(file("src/main/scala"), file("src/androidTest/scala"))
 
 proguardOptions in Android ++= Seq(
-    "-keep public class sword.langbook.android.db.SQLiteStorageManagerTest { public void test*(); }"
+    "-keep public class sword.langbook.android.db.SQLiteStorageManagerTest { public void test*(); }",
+    "-keep public class android.support.v7.widget.SearchView { public <init>(android.content.Context); public <init>(android.content.Context, android.util.AttributeSet); }"
 )

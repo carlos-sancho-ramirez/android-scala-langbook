@@ -1,8 +1,9 @@
 package sword.langbook.android.activities
 
-import android.app.Activity
-import android.content.Intent
+import android.app.{SearchManager, Activity}
+import android.content.{Context, Intent}
 import android.os.Bundle
+import android.support.v7.widget.SearchView
 import android.view._
 import android.widget.{AbsListView, BaseAdapter, AdapterView}
 import sword.db.ForeignKeyField
@@ -67,6 +68,12 @@ class Selector extends BaseActivity with AdapterView.OnItemClickListener with Se
 
   override def onCreateOptionsMenu(menu: Menu) = {
     getMenuInflater.inflate(R.menu.selector, menu)
+
+    val searchManager = getSystemService(Context.SEARCH_SERVICE).asInstanceOf[SearchManager]
+    val searchView = menu.findItem(R.id.searchOption).getActionView.asInstanceOf[SearchView]
+    searchView.setSearchableInfo(searchManager.getSearchableInfo(getComponentName))
+    searchView.setIconifiedByDefault(false)
+
     true
   }
 
