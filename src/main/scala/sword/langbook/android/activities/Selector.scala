@@ -31,7 +31,7 @@ class Selector extends BaseActivity with AdapterView.OnItemClickListener with Se
 
   class Adapter extends BaseAdapter {
     val allItems = linkedDb.words.values.toVector
-    lazy val allTexts = allItems.map(word => (word, word.text.values)).toMap
+    lazy val allTexts = allItems.map(word => (word, word.text.values.toList)).toMap
 
     private var _query = ""
     private var _items: IndexedSeq[Word] = allItems
@@ -70,8 +70,8 @@ class Selector extends BaseActivity with AdapterView.OnItemClickListener with Se
         else query
       }
 
-      if (_query != query) {
-        _query = query
+      if (_query != q) {
+        _query = q
         updateItems()
       }
     }
