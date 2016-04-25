@@ -734,6 +734,30 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
   }
 
+  private def getCollection[R <: Register](db: SQLiteDatabase, regDef: CollectibleRegisterDefinition[R], id: Register.CollectionId): Set[R] = {
+    val selection = regDef.fields.map(fieldName(regDef, _)).toArray
+    val cursor = query(db, tableName(regDef), selection, s"${SQLiteStorageManager.collKey}=$id", null)
+
+    if (cursor == null) Set()
+    else try {
+      if (cursor.getCount <= 0 || !cursor.moveToFirst()) Set()
+      else {
+        val buffer = scala.collection.mutable.ListBuffer[R]()
+        val fieldIndexes = for (fieldDef <- regDef.fields) yield {
+          cursor.getColumnIndex(fieldName(regDef, fieldDef))
+        }
+
+        do {
+          val fieldValues = fieldIndexes.map(cursor.getString)
+          buffer += regDef.from(fieldValues, keyExtractor).get
+        } while(cursor.moveToNext())
+        buffer.toSet
+      }
+    } finally {
+      cursor.close()
+    }
+  }
+
   private def getArray[R <: Register](db: SQLiteDatabase, regDef: ArrayableRegisterDefinition[R], id: Register.CollectionId) :Seq[R] = {
 
     val orderClause = s"${SQLiteStorageManager.idKey} ASC"
@@ -851,6 +875,10 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
   override def getMapForCollection[R <: Register](registerDefinition: CollectibleRegisterDefinition[R], id: CollectionId): Map[Key, R] = {
     withReadableDatabase(getMapForCollection(_, registerDefinition, id))
+  }
+
+  override def getCollection[R <: Register](registerDefinition: CollectibleRegisterDefinition[R], id: Register.CollectionId): Set[R] = {
+    withReadableDatabase(getCollection(_, registerDefinition, id))
   }
 
   override def getArray[R <: Register](registerDefinition: ArrayableRegisterDefinition[R], id: Register.CollectionId) :Seq[R] = {
