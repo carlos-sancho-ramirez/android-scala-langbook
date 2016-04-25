@@ -9,7 +9,7 @@ import android.widget.{AbsListView, BaseAdapter, AdapterView}
 import sword.db.ForeignKeyField
 import sword.langbook.android.{TR, R}
 import sword.langbook.android.TypedResource._
-import sword.langbook.db.registers
+import sword.langbook.db.{Word, registers}
 
 import scala.collection.Set
 
@@ -25,25 +25,55 @@ object Selector {
   }
 }
 
-class Selector extends BaseActivity with AdapterView.OnItemClickListener with SelectorChoiceModeCallback {
+class Selector extends BaseActivity with AdapterView.OnItemClickListener with SelectorChoiceModeCallback with SearchView.OnQueryTextListener {
 
   lazy val listView = findView(TR.listView)
 
   class Adapter extends BaseAdapter {
-    lazy val items = linkedDb.words.values.toList
+    val allItems = linkedDb.words.values.toVector
+    lazy val allTexts = allItems.map(word => (word, word.text.values)).toMap
+
+    private var _query = ""
+    private var _items: IndexedSeq[Word] = allItems
 
     override def getItemId(position: Int) = position
-    override def getCount = items.size
-    override def getItem(position: Int) = items(position)
+    override def getCount = _items.size
+    override def getItem(position: Int) = _items(position)
 
     override def getView(position: Int, convertView: View, parent: ViewGroup) = {
       val view = {
         if (convertView != null) convertView
         else LayoutInflater.from(parent.getContext).inflate(R.layout.selector_entry, parent, false)
       }
-      val text = items(position).suitableText.getOrElse("")
+
+      val text = _items(position).suitableText.getOrElse("")
       view.findView(TR.selectorEntry).setText(text)
       view
+    }
+
+    private def updateItems(): Unit = {
+      _items = {
+        if (_query.isEmpty) allItems
+        else allTexts.flatMap {
+          case (word, strings) =>
+            if (strings.exists(_.contains(_query))) Some(word)
+            else None
+        }.toVector
+      }
+
+      notifyDataSetChanged()
+    }
+
+    def setQuery(query: String) = {
+      val q = {
+        if (query == null) ""
+        else query
+      }
+
+      if (_query != query) {
+        _query = query
+        updateItems()
+      }
     }
   }
 
@@ -73,7 +103,7 @@ class Selector extends BaseActivity with AdapterView.OnItemClickListener with Se
     val searchView = menu.findItem(R.id.searchOption).getActionView.asInstanceOf[SearchView]
     searchView.setSearchableInfo(searchManager.getSearchableInfo(getComponentName))
     searchView.setIconifiedByDefault(false)
-
+    searchView.setOnQueryTextListener(this)
     true
   }
 
@@ -122,5 +152,15 @@ class Selector extends BaseActivity with AdapterView.OnItemClickListener with Se
     if (positions.nonEmpty) {
       invalidateAdapter()
     }
+  }
+
+  override def onQueryTextSubmit(query: String): Boolean = {
+    // Nothing to be done
+    false
+  }
+
+  override def onQueryTextChange(query: String): Boolean = {
+    listView.getAdapter.asInstanceOf[Adapter].setQuery(query)
+    true
   }
 }
