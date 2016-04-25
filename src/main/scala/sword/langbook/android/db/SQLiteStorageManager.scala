@@ -514,15 +514,26 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     regDef.from(fieldValues, keyExtractor).get
   }
 
+  private case class GetParams(regDef: RegisterDefinition[Register]) {
+    val table = tableName(regDef)
+    val columns = regDef.fields.map(fieldName(regDef,_)).toArray
+  }
+
+  private val getParams = registerDefinitions.map(regDef => (regDef, GetParams(regDef))).toMap
+
   private def get(db :SQLiteDatabase, key: Key): Option[Register] = {
     val regDef = key.registerDefinition
-    val cursor = query(db, tableName(regDef), regDef.fields.map(fieldName(regDef,_)).toArray,
-      s"${SQLiteStorageManager.idKey}=${key.index}", null)
+    val params = getParams(regDef)
+    val columns = params.columns
+    val cursor = query(db, params.table, columns, s"${SQLiteStorageManager.idKey}=${key.index}", null)
 
     if (cursor == null) None
     else try {
       if (cursor.getCount <= 0 || !cursor.moveToFirst()) None
-      else Some(fromCursor(regDef, cursor))
+      else {
+        val fieldValues = columns.indices.map(cursor.getString)
+        regDef.from(fieldValues, keyExtractor)
+      }
     } finally {
       cursor.close()
     }
@@ -734,21 +745,28 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
   }
 
+  private case class GetCollectionParams(regDef: RegisterDefinition[Register]) {
+    val table = tableName(regDef)
+    val columns = regDef.fields.map(fieldName(regDef, _)).toArray
+    val columnIndices = columns.indices
+  }
+
+  private val getCollectionParams = registerDefinitions.collect {
+    case regDef: CollectibleRegisterDefinition[Register] => (regDef, GetCollectionParams(regDef))
+  }.toMap
+
   private def getCollection[R <: Register](db: SQLiteDatabase, regDef: CollectibleRegisterDefinition[R], id: Register.CollectionId): Set[R] = {
-    val selection = regDef.fields.map(fieldName(regDef, _)).toArray
-    val cursor = query(db, tableName(regDef), selection, s"${SQLiteStorageManager.collKey}=$id", null)
+    val params = getCollectionParams(regDef)
+    val cursor = query(db, params.table, params.columns, s"${SQLiteStorageManager.collKey}=$id", null)
 
     if (cursor == null) Set()
     else try {
       if (cursor.getCount <= 0 || !cursor.moveToFirst()) Set()
       else {
         val buffer = scala.collection.mutable.ListBuffer[R]()
-        val fieldIndexes = for (fieldDef <- regDef.fields) yield {
-          cursor.getColumnIndex(fieldName(regDef, fieldDef))
-        }
-
+        val indices = params.columnIndices
         do {
-          val fieldValues = fieldIndexes.map(cursor.getString)
+          val fieldValues = indices.map(cursor.getString)
           buffer += regDef.from(fieldValues, keyExtractor).get
         } while(cursor.moveToNext())
         buffer.toSet
@@ -758,24 +776,32 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
   }
 
+  private case class GetArrayParams(regDef: ArrayableRegisterDefinition[Register]) {
+    val table = tableName(regDef)
+    val columns = regDef.fields.map(fieldName(regDef, _)).toArray
+    val columnIndices = columns.indices
+  }
+
+  private val getArrayParams = registerDefinitions.collect {
+    case regDef: ArrayableRegisterDefinition[Register] => (regDef, GetArrayParams(regDef))
+  }.toMap
+
+  val getArrayOrderClause = s"${SQLiteStorageManager.idKey} ASC"
+
   private def getArray[R <: Register](db: SQLiteDatabase, regDef: ArrayableRegisterDefinition[R], id: Register.CollectionId) :Seq[R] = {
 
-    val orderClause = s"${SQLiteStorageManager.idKey} ASC"
-    val selection = Array(SQLiteStorageManager.idKey) ++ regDef.fields.map(fieldName(regDef, _))
-    val cursor = query(db, tableName(regDef), selection, s"${SQLiteStorageManager.collKey}=$id",
-        orderClause)
+    val params = getArrayParams(regDef)
+    val cursor = query(db, params.table, params.columns, s"${SQLiteStorageManager.collKey}=$id",
+        getArrayOrderClause)
 
     if (cursor == null) Seq()
     else try {
       if (cursor.getCount <= 0 || !cursor.moveToFirst()) Seq()
       else {
         val buffer = scala.collection.mutable.ListBuffer[R]()
-        val fieldIndexes = for (fieldDef <- regDef.fields) yield {
-          cursor.getColumnIndex(fieldName(regDef, fieldDef))
-        }
-
+        val indices = params.columnIndices
         do {
-          val fieldValues = fieldIndexes.map(cursor.getString)
+          val fieldValues = indices.map(cursor.getString)
           buffer += regDef.from(fieldValues, keyExtractor).get
         } while(cursor.moveToNext())
         buffer.toList
