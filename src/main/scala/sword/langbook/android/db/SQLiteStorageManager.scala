@@ -128,7 +128,14 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
         case _ => fields
       }).mkString(", ")
 
-      exec(db, s"CREATE TABLE IF NOT EXISTS ${tableName(regDef)} ($idKey INTEGER PRIMARY KEY AUTOINCREMENT, $columns)")
+      val tName = tableName(regDef)
+      exec(db, s"CREATE TABLE IF NOT EXISTS $tName ($idKey INTEGER PRIMARY KEY AUTOINCREMENT, $columns)")
+
+      regDef match {
+        case _: CollectibleRegisterDefinition[_] =>
+          exec(db, s"CREATE INDEX IF NOT EXISTS ${tName}_${SQLiteStorageManager.collKey} ON $tName(${SQLiteStorageManager.collKey})")
+        case _ =>
+      }
     }
   }
 
