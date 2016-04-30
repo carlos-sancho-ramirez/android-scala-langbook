@@ -16,6 +16,8 @@ lazy val generic = (project in file("generic"))
       exportJars := true
     )
 
+//instrumentTestRunner in Android := "sword.langbook.android.test.PerformanceTestInstrumentation"
+
 sourceDirectories in Android := Seq(file("src/main/scala"), file("src/androidTest/scala"))
 
 proguardOptions in Android ++= Seq(
