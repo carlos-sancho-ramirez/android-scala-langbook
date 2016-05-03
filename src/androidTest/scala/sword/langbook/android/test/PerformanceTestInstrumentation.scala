@@ -102,6 +102,9 @@ class PerformanceTestInstrumentation extends Instrumentation {
       val testsInstance = LinkedStorageManagerTests(this)
       val suiteName = testsInstance.getClass.getName
       runPerformanceTest(suiteName, "allWordTests", testsInstance.allWordTexts _)
+      runPerformanceTest(suiteName, "possibleInterAlphabetQuestions", testsInstance.possibleInterAlphabetQuestions _)
+      runPerformanceTest(suiteName, "possibleSynonymQuestions", testsInstance.possibleSynonymQuestions _)
+      runPerformanceTest(suiteName, "possibleTranslationQuestions", testsInstance.possibleTranslationQuestions _)
     }
 
     val results = new Bundle()
