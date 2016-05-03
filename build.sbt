@@ -24,3 +24,10 @@ proguardOptions in Android ++= Seq(
     "-keep public class sword.langbook.android.db.SQLiteStorageManagerTest { public void test*(); }",
     "-keep public class android.support.v7.widget.SearchView { public <init>(android.content.Context); public <init>(android.content.Context, android.util.AttributeSet); }"
 )
+
+lazy val perfTests = taskKey[Unit]("Run the performance tests")
+
+perfTests := {
+  "adb shell am instrument -w -e enablePerformanceTests true sword.langbook.android/.test.PerformanceTestInstrumentation" !
+}
+

@@ -52,6 +52,9 @@ object PerformanceTestInstrumentation {
  *
  * This instrumentation can be run from the command line using the following command
  * $ adb shell am instrument -w sword.langbook.android/.test.PerformanceTestInstrumentation
+ *
+ * This can only be run through the sbt task "perfTests"
+ * $ sbt android:test perfTests
  */
 class PerformanceTestInstrumentation extends Instrumentation {
 
