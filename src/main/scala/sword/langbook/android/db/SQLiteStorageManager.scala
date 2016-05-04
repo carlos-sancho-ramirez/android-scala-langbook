@@ -136,6 +136,13 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
           exec(db, s"CREATE INDEX IF NOT EXISTS ${tName}_${SQLiteStorageManager.collKey} ON $tName(${SQLiteStorageManager.collKey})")
         case _ =>
       }
+
+      regDef.fields.collect {
+        case f: ForeignKeyFieldDefinition => f
+      }.foreach { f =>
+        val fName = fieldName(regDef, f)
+        exec(db, s"CREATE INDEX IF NOT EXISTS ${tName}_$fName ON $tName($fName)")
+      }
     }
   }
 
