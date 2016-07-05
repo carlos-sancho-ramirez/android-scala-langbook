@@ -145,23 +145,19 @@ class WordEditor extends BaseActivity with View.OnClickListener {
         (v.fields(0).asInstanceOf[sword.db.UnicodeField].value, k)
       }
       val symbolArrayCollection = manager.insert(text.map(currentSymbols(_)).map(registers.SymbolPosition(_)))
-      symbolArrayCollection.map(array => registers.Piece(alphabet.key, array))
+      symbolArrayCollection.map(array => (alphabet.key, array))
     }
 
     val pieceSet = pieceOptionsSet.flatMap(x => x)
     if (pieceSet.nonEmpty) {
       for {
         languageKey <- languageKeyOpt
+        wordKey <- manager.insert(registers.Word(languageKey))
+        (alphabetKey, symbolArray) <- pieceSet
       } {
         import sword.langbook.db.registers
 
-        val piece = manager.insert(pieceSet)
-
-        // Right now we are assuming that there is only one piece per word
-        // TODO: Make possible to add more than one piece for word
-        val pieceArray = piece.flatMap(piece => manager.insert(List(registers.PiecePosition(piece))))
-
-        val word = pieceArray.flatMap(array => manager.insert(registers.Word(languageKey, array)))
+        manager.insert(registers.WordRepresentation(wordKey, alphabetKey, symbolArray))
 
         val argsConceptKey = getIntent.getStringArrayExtra(BundleKeys.conceptKeys).flatMap(manager.decode)
         val conceptKeys = {
@@ -170,7 +166,6 @@ class WordEditor extends BaseActivity with View.OnClickListener {
         }
 
         for {
-          wordKey <- word
           conceptKey <- conceptKeys
         } {
           manager.insert(registers.WordConcept(wordKey, conceptKey))

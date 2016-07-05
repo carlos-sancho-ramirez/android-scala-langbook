@@ -6,6 +6,7 @@ import android.database.sqlite.{SQLiteDatabase, SQLiteOpenHelper}
 import android.util.Log
 import sword.db.Register.CollectionId
 import sword.db._
+import sword.langbook.db.registers.LanguageReferenceField
 
 import scala.collection.mutable.ListBuffer
 
@@ -241,68 +242,41 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val kanaJpSymbolArrayCollection = insert(db, kanaJpText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
     val kanaKanaSymbolArrayCollection = insert(db, kanaKanaText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
 
-    val languageEnPiece = insert(db, List(registers.Piece(enAlphabetKey, languageEnSymbolArrayCollection))).get
-    val languageSpPiece = insert(db, List(registers.Piece(spAlphabetKey, languageSpSymbolArrayCollection))).get
-    val languageJpPiece = insert(db, List(
-      registers.Piece(kanjiAlphabetKey, languageKanjiSymbolArrayCollection),
-      registers.Piece(kanaAlphabetKey, languageKanaSymbolArrayCollection)
-    )).get
-    val englishEnPiece = insert(db, List(registers.Piece(enAlphabetKey, englishEnSymbolArrayCollection))).get
-    val englishSpPiece = insert(db, List(registers.Piece(spAlphabetKey, englishSpSymbolArrayCollection))).get
-    val englishJpPiece = insert(db, List(
-        registers.Piece(kanjiAlphabetKey, englishJpSymbolArrayCollection),
-        registers.Piece(kanaAlphabetKey, englishKanaSymbolArrayCollection)
-    )).get
-    val spanishEnPiece = insert(db, List(registers.Piece(enAlphabetKey, spanishEnSymbolArrayCollection))).get
-    val spanishSpPiece = insert(db, List(registers.Piece(spAlphabetKey, spanishSpSymbolArrayCollection))).get
-    val spanishJpPiece = insert(db, List(
-        registers.Piece(kanjiAlphabetKey, spanishJpSymbolArrayCollection),
-        registers.Piece(kanaAlphabetKey, spanishKanaSymbolArrayCollection)
-    )).get
-    val japaneseEnPiece = insert(db, List(registers.Piece(enAlphabetKey, japaneseEnSymbolArrayCollection))).get
-    val japaneseSpPiece = insert(db, List(registers.Piece(spAlphabetKey, japaneseSpSymbolArrayCollection))).get
-    val japaneseJpPiece = insert(db, List(
-        registers.Piece(kanjiAlphabetKey, japaneseJpSymbolArrayCollection),
-        registers.Piece(kanaAlphabetKey, japaneseKanaSymbolArrayCollection)
-    )).get
-    val kanjiJpPiece = insert(db, List(
-      registers.Piece(kanjiAlphabetKey, kanjiJpSymbolArrayCollection),
-      registers.Piece(kanaAlphabetKey, kanjiKanaSymbolArrayCollection)
-    )).get
-    val kanaJpPiece = insert(db, List(
-      registers.Piece(kanjiAlphabetKey, kanaJpSymbolArrayCollection),
-      registers.Piece(kanaAlphabetKey, kanaKanaSymbolArrayCollection)
-    )).get
+    val languageEnWord = insert(db, registers.Word(englishKey)).get
+    val languageSpWord = insert(db, registers.Word(spanishKey)).get
+    val languageJpWord = insert(db, registers.Word(japaneseKey)).get
+    val englishEnWord = insert(db, registers.Word(englishKey)).get
+    val englishSpWord = insert(db, registers.Word(spanishKey)).get
+    val englishJpWord = insert(db, registers.Word(japaneseKey)).get
+    val spanishEnWord = insert(db, registers.Word(englishKey)).get
+    val spanishSpWord = insert(db, registers.Word(spanishKey)).get
+    val spanishJpWord = insert(db, registers.Word(japaneseKey)).get
+    val japaneseEnWord = insert(db, registers.Word(englishKey)).get
+    val japaneseSpWord = insert(db, registers.Word(spanishKey)).get
+    val japaneseJpWord = insert(db, registers.Word(japaneseKey)).get
+    val kanjiJpWord = insert(db, registers.Word(japaneseKey)).get
+    val kanaJpWord = insert(db, registers.Word(japaneseKey)).get
 
-    val languageEnPieceArray = insert(db, List(registers.PiecePosition(languageEnPiece))).get
-    val languageSpPieceArray = insert(db, List(registers.PiecePosition(languageSpPiece))).get
-    val languageJpPieceArray = insert(db, List(registers.PiecePosition(languageJpPiece))).get
-    val englishEnPieceArray = insert(db, List(registers.PiecePosition(englishEnPiece))).get
-    val englishSpPieceArray = insert(db, List(registers.PiecePosition(englishSpPiece))).get
-    val englishJpPieceArray = insert(db, List(registers.PiecePosition(englishJpPiece))).get
-    val spanishEnPieceArray = insert(db, List(registers.PiecePosition(spanishEnPiece))).get
-    val spanishSpPieceArray = insert(db, List(registers.PiecePosition(spanishSpPiece))).get
-    val spanishJpPieceArray = insert(db, List(registers.PiecePosition(spanishJpPiece))).get
-    val japaneseEnPieceArray = insert(db, List(registers.PiecePosition(japaneseEnPiece))).get
-    val japaneseSpPieceArray = insert(db, List(registers.PiecePosition(japaneseSpPiece))).get
-    val japaneseJpPieceArray = insert(db, List(registers.PiecePosition(japaneseJpPiece))).get
-    val kanjiJpPieceArray = insert(db, List(registers.PiecePosition(kanjiJpPiece))).get
-    val kanaJpPieceArray = insert(db, List(registers.PiecePosition(kanaJpPiece))).get
-
-    val languageEnWord = insert(db, registers.Word(englishKey, languageEnPieceArray)).get
-    val languageSpWord = insert(db, registers.Word(spanishKey, languageSpPieceArray)).get
-    val languageJpWord = insert(db, registers.Word(japaneseKey, languageJpPieceArray)).get
-    val englishEnWord = insert(db, registers.Word(englishKey, englishEnPieceArray)).get
-    val englishSpWord = insert(db, registers.Word(spanishKey, englishSpPieceArray)).get
-    val englishJpWord = insert(db, registers.Word(japaneseKey, englishJpPieceArray)).get
-    val spanishEnWord = insert(db, registers.Word(englishKey, spanishEnPieceArray)).get
-    val spanishSpWord = insert(db, registers.Word(spanishKey, spanishSpPieceArray)).get
-    val spanishJpWord = insert(db, registers.Word(japaneseKey, spanishJpPieceArray)).get
-    val japaneseEnWord = insert(db, registers.Word(englishKey, japaneseEnPieceArray)).get
-    val japaneseSpWord = insert(db, registers.Word(spanishKey, japaneseSpPieceArray)).get
-    val japaneseJpWord = insert(db, registers.Word(japaneseKey, japaneseJpPieceArray)).get
-    val kanjiJpWord = insert(db, registers.Word(japaneseKey, kanjiJpPieceArray)).get
-    val kanaJpWord = insert(db, registers.Word(japaneseKey, kanaJpPieceArray)).get
+    insert(db, registers.WordRepresentation(languageEnWord, enAlphabetKey, languageEnSymbolArrayCollection))
+    insert(db, registers.WordRepresentation(languageSpWord, spAlphabetKey, languageSpSymbolArrayCollection))
+    insert(db, registers.WordRepresentation(languageJpWord, kanjiAlphabetKey, languageKanjiSymbolArrayCollection))
+    insert(db, registers.WordRepresentation(languageJpWord, kanaAlphabetKey, languageKanaSymbolArrayCollection))
+    insert(db, registers.WordRepresentation(englishEnWord, enAlphabetKey, englishEnSymbolArrayCollection))
+    insert(db, registers.WordRepresentation(englishSpWord, spAlphabetKey, englishSpSymbolArrayCollection))
+    insert(db, registers.WordRepresentation(englishJpWord, kanjiAlphabetKey, englishJpSymbolArrayCollection))
+    insert(db, registers.WordRepresentation(englishJpWord, kanaAlphabetKey, englishKanaSymbolArrayCollection))
+    insert(db, registers.WordRepresentation(spanishEnWord, enAlphabetKey, spanishEnSymbolArrayCollection))
+    insert(db, registers.WordRepresentation(spanishSpWord, spAlphabetKey, spanishSpSymbolArrayCollection))
+    insert(db, registers.WordRepresentation(spanishJpWord, kanjiAlphabetKey, spanishJpSymbolArrayCollection))
+    insert(db, registers.WordRepresentation(spanishJpWord, kanaAlphabetKey, spanishKanaSymbolArrayCollection))
+    insert(db, registers.WordRepresentation(japaneseEnWord, enAlphabetKey, japaneseEnSymbolArrayCollection))
+    insert(db, registers.WordRepresentation(japaneseSpWord, spAlphabetKey, japaneseSpSymbolArrayCollection))
+    insert(db, registers.WordRepresentation(japaneseJpWord, kanjiAlphabetKey, japaneseJpSymbolArrayCollection))
+    insert(db, registers.WordRepresentation(japaneseJpWord, kanaAlphabetKey, japaneseKanaSymbolArrayCollection))
+    insert(db, registers.WordRepresentation(kanjiJpWord, kanjiAlphabetKey, kanjiJpSymbolArrayCollection))
+    insert(db, registers.WordRepresentation(kanjiJpWord, kanaAlphabetKey, kanjiKanaSymbolArrayCollection))
+    insert(db, registers.WordRepresentation(kanaJpWord, kanjiAlphabetKey, kanaJpSymbolArrayCollection))
+    insert(db, registers.WordRepresentation(kanaJpWord, kanaAlphabetKey, kanjiKanaSymbolArrayCollection))
 
     insert(db, registers.WordConcept(languageEnWord, languageConceptKey))
     insert(db, registers.WordConcept(languageSpWord, languageConceptKey))
@@ -396,52 +370,19 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
         Log.i("kana extraction", "japaneseKey is " + japaneseKey.encoded)
         Log.i("kana extraction", "kanjiKey is " + kanjiKey.encoded)
 
-        val words = keysFor(db, registers.Word).flatMap(get(db, _))
-        Log.i("kana extraction", "words size is " + words.size)
-
-        val piecePositionKeys = words.filter {
-          _.fields.collectFirst {
-            case f: ForeignKeyField if f.definition.target == registers.Language && f
-              .key == japaneseKey => true
-          }.isDefined
-        }.map { wordReg =>
-          wordReg.fields.collectFirst {
-            case f: CollectionReferenceField if f.definition.target == registers.PiecePosition =>
-              f.collectionId
-          }.get
-        }
-        Log.i("kana extraction", "piecePositionKeys size is " + piecePositionKeys.size)
-
-        val pieceKeys = piecePositionKeys.flatMap { piecePositionCollectionId =>
-          getMapForCollection(db, registers.PiecePosition, piecePositionCollectionId).values.flatMap {
-            _.fields.collectFirst {
-              case f: CollectionReferenceField if f.definition.target == registers.Piece => f.collectionId
-            }
-          }
-        }
-        Log.i("kana extraction", "pieceKeys size is " + pieceKeys.size)
-
-        val alphabetKeys = pieceKeys.flatMap { pieceCollectionId =>
-          getMapForCollection(db, registers.Piece, pieceCollectionId).values.map {
-            _.fields.collectFirst {
-              case f: ForeignKeyField if f.definition.target == registers.Alphabet => f.key
-            }.get
-          }
-        }
-        Log.i("kana extraction", "alphabetKeys size is " + pieceKeys.size)
-
-        val kanaKey = (alphabetKeys - kanjiKey).head
+        val kanaKey = (getMapFor(registers.WordRepresentation, LanguageReferenceField(japaneseKey))
+            .foldLeft(Set[Key]()){ (set, repr) => set + repr._2.alphabet } - kanjiKey).head
 
         do {
           val written = insert(db, cursor.getString(0).map(c => registers.SymbolPosition(allSymbolsReverse(c.toInt)))).get
           val kana = insert(db, cursor.getString(1).map(c => registers.SymbolPosition(allSymbolsReverse(c.toInt)))).get
           val meaning = insert(db, cursor.getString(2).map(c => registers.SymbolPosition(allSymbolsReverse(c.toInt)))).get
-          val jaPiece = insert(db, List(registers.Piece(kanjiKey, written), registers.Piece(kanaKey, kana))).get
-          val esPiece = insert(db, List(registers.Piece(spanishAlphabetKey, meaning))).get
-          val jaPieceArray = insert(db, List(registers.PiecePosition(jaPiece))).get
-          val esPieceArray = insert(db, List(registers.PiecePosition(esPiece))).get
-          val jaWord = insert(db, registers.Word(japaneseKey, jaPieceArray)).get
-          val esWord = insert(db, registers.Word(spanishKey, esPieceArray)).get
+          val jaWord = insert(db, registers.Word(japaneseKey)).get
+          val esWord = insert(db, registers.Word(spanishKey)).get
+          insert(db, registers.WordRepresentation(jaWord, kanjiKey, written))
+          insert(db, registers.WordRepresentation(jaWord, kanaKey, kana))
+          insert(db, registers.WordRepresentation(esWord, spanishAlphabetKey, meaning))
+
           val concept = insert(db, registers.Concept(cursor.getString(0))).get
           insert(db, registers.WordConcept(jaWord, concept))
           insert(db, registers.WordConcept(esWord, concept))
