@@ -370,8 +370,15 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
         Log.i("kana extraction", "japaneseKey is " + japaneseKey.encoded)
         Log.i("kana extraction", "kanjiKey is " + kanjiKey.encoded)
 
-        val kanaKey = (getMapFor(registers.WordRepresentation, LanguageReferenceField(japaneseKey))
-            .foldLeft(Set[Key]()){ (set, repr) => set + repr._2.alphabet } - kanjiKey).head
+        val jpWords = keysFor(db, registers.Word, LanguageReferenceField(japaneseKey))
+        val jpAlphabetKeys = getMapFor(db, registers.WordRepresentation)
+            .foldLeft(Set[Key]()) { (set, repr) =>
+              if (jpWords(repr._2.word)) set + repr._2.alphabet
+              else set
+            }
+
+        assert(jpAlphabetKeys.size == 2)
+        val kanaKey = (jpAlphabetKeys - kanjiKey).head
 
         do {
           val written = insert(db, cursor.getString(0).map(c => registers.SymbolPosition(allSymbolsReverse(c.toInt)))).get
@@ -393,7 +400,9 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
   }
 
-  private def getMapFor[R <: Register](db: SQLiteDatabase, regDef: RegisterDefinition[R], filter: ForeignKeyField): scala.collection.Map[Key, R] = {
+  private def mapFor[R <: Register](regDef: RegisterDefinition[R],
+      f: (String, Array[String]) => Cursor): scala.collection.Map[Key, R] = {
+
     val array = (regDef match {
       case _: CollectibleRegisterDefinition[_] =>
         Array(SQLiteStorageManager.idKey, SQLiteStorageManager.collKey)
@@ -401,8 +410,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
         Array(SQLiteStorageManager.idKey)
     }) ++ regDef.fields.map(fieldName(regDef,_))
 
-    val whereClause = s"${fieldName(regDef, filter)}=${filter.key.index}"
-    val cursor = query(db, tableName(regDef), array, whereClause, null)
+    val cursor = f(tableName(regDef), array)
 
     if (cursor == null) Map()
     else try {
@@ -423,6 +431,16 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     } finally {
       cursor.close()
     }
+  }
+
+  private def getMapFor[R <: Register](db: SQLiteDatabase,
+      regDef: RegisterDefinition[R]): scala.collection.Map[Key, R] = {
+    mapFor(regDef, query(db, _, _, null, null))
+  }
+
+  private def getMapFor[R <: Register](db: SQLiteDatabase, regDef: RegisterDefinition[R], filter: ForeignKeyField): scala.collection.Map[Key, R] = {
+    val whereClause = s"${fieldName(regDef, filter)}=${filter.key.index}"
+    mapFor(regDef, query(db, _, _, whereClause, null))
   }
 
   private def getMapForCollection[R <: Register](db: SQLiteDatabase,
