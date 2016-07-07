@@ -50,11 +50,21 @@ object PerformanceTestInstrumentation {
  * the following line is included and not commented in the build.sbt file.
  *   instrumentTestRunner in Android := "sword.langbook.android.test.PerformanceTestInstrumentation"
  *
+ * Once ensured that the instrumentationTestRunner is included and not commented in build.sbt, run
+ * the android:test sbt task to force the compilation with the given instrumentation included and
+ * run the tests to ensure all works.
+ * $ sbt android:test
+ *
  * This instrumentation can be run from the command line using the following command
  * $ adb shell am instrument -w sword.langbook.android/.test.PerformanceTestInstrumentation
  *
  * This can only be run through the sbt task "perfTests"
  * $ sbt android:test perfTests
+ *
+ * All this process can be archived in a single command execution by adding all tasks
+ * $ sbt clean android:test perfTests
+ *
+ * NOTE: Be sure that adb is included in the PATH environment variable before proceeding.
  */
 class PerformanceTestInstrumentation extends Instrumentation {
 
