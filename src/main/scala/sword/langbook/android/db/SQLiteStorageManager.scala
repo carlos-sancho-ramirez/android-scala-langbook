@@ -6,7 +6,7 @@ import android.database.sqlite.{SQLiteDatabase, SQLiteOpenHelper}
 import android.util.Log
 import sword.db.Register.CollectionId
 import sword.db._
-import sword.langbook.db.registers.{WordReferenceFieldDefinition, LanguageReferenceField}
+import sword.langbook.db.registers.{AlphabetReferenceField, WordReferenceFieldDefinition, LanguageReferenceField}
 
 import scala.collection.mutable.ListBuffer
 
@@ -400,12 +400,19 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
             }
           }
 
+          val representations = getMapFor(db, registers.WordRepresentation, AlphabetReferenceField(spanishAlphabetKey)).values
           for (meaning <- meanings) {
-            // TODO: Avoid adding symbols and word if it already exists (synonyms)
-            val symbolArray = insert(db, meaning.map(c => registers.SymbolPosition(allSymbolsReverse(c.toInt)))).get
-            val esWord = insert(db, registers.Word(spanishKey)).get
+            val reprOpt = representations.find(repr => getStringArray(db, registers.SymbolPosition, repr.symbolArray, registers.SymbolReferenceFieldDefinition) == meaning)
+            val esWord = if (reprOpt.isEmpty) {
+              val symbolArray = insert(db, meaning.map(c => registers.SymbolPosition(allSymbolsReverse(c.toInt)))).get
+              val word = insert(db, registers.Word(spanishKey)).get
+              insert(db, registers.WordRepresentation(word, spanishAlphabetKey, symbolArray))
+              word
+            }
+            else {
+              reprOpt.get.word
+            }
 
-            insert(db, registers.WordRepresentation(esWord, spanishAlphabetKey, symbolArray))
             insert(db, registers.WordConcept(esWord, concept))
           }
         } while(cursor.moveToNext())
@@ -937,36 +944,42 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
   override def getStringArray[R <: Register](registerDefinition: ArrayableRegisterDefinition[R],
       id: Register.CollectionId, matcher: ForeignKeyFieldDefinition) :String = {
+    withReadableDatabase(getStringArray(_, registerDefinition, id, matcher))
+  }
 
-    withReadableDatabase { db =>
-      val params = getArrayParams(registerDefinition)
+  private def getStringArray[R <: Register](
+      db: SQLiteDatabase,
+      registerDefinition: ArrayableRegisterDefinition[R],
+      id: Register.CollectionId,
+      matcher: ForeignKeyFieldDefinition) :String = {
 
-      val symbolTableName = tableName(matcher.target)
-      val symbolPositionTableName = params.table
+    val params = getArrayParams(registerDefinition)
 
-      val symbolRefFieldName = fieldName(registerDefinition, matcher)
+    val symbolTableName = tableName(matcher.target)
+    val symbolPositionTableName = params.table
 
-      val symbolUnicodeFieldDef = sword.db.UnicodeFieldDefinition
-      val symbolUnicodeFieldName = fieldName(matcher.target, symbolUnicodeFieldDef)
+    val symbolRefFieldName = fieldName(registerDefinition, matcher)
 
-      val query = s"SELECT $symbolTableName.$symbolUnicodeFieldName FROM $symbolPositionTableName JOIN $symbolTableName ON $symbolTableName.${SQLiteStorageManager.idKey} = $symbolPositionTableName.$symbolRefFieldName WHERE $symbolPositionTableName.${SQLiteStorageManager.collKey} = $id ORDER BY $symbolPositionTableName.${SQLiteStorageManager.idKey} ASC"
-      val cursor = db.rawQuery(query, null)
+    val symbolUnicodeFieldDef = sword.db.UnicodeFieldDefinition
+    val symbolUnicodeFieldName = fieldName(matcher.target, symbolUnicodeFieldDef)
 
-      val s = new StringBuilder()
-      var count = 0
-      if (cursor != null) try {
-        count = cursor.getCount
-        if (cursor.getCount > 0 && cursor.moveToFirst()) {
-          do {
-            s.append(cursor.getInt(0).toChar)
-          } while(cursor.moveToNext())
-        }
-      } finally {
-        cursor.close()
+    val query = s"SELECT $symbolTableName.$symbolUnicodeFieldName FROM $symbolPositionTableName JOIN $symbolTableName ON $symbolTableName.${SQLiteStorageManager.idKey} = $symbolPositionTableName.$symbolRefFieldName WHERE $symbolPositionTableName.${SQLiteStorageManager.collKey} = $id ORDER BY $symbolPositionTableName.${SQLiteStorageManager.idKey} ASC"
+    val cursor = db.rawQuery(query, null)
+
+    val s = new StringBuilder()
+    var count = 0
+    if (cursor != null) try {
+      count = cursor.getCount
+      if (cursor.getCount > 0 && cursor.moveToFirst()) {
+        do {
+          s.append(cursor.getInt(0).toChar)
+        } while(cursor.moveToNext())
       }
-
-      s.toString
+    } finally {
+      cursor.close()
     }
+
+    s.toString
   }
 
   override def isConceptDuplicated(alphabet: Key): Boolean = {
