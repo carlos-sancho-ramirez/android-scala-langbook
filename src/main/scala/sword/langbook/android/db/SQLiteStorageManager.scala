@@ -383,16 +383,31 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
         do {
           val written = insert(db, cursor.getString(0).map(c => registers.SymbolPosition(allSymbolsReverse(c.toInt)))).get
           val kana = insert(db, cursor.getString(1).map(c => registers.SymbolPosition(allSymbolsReverse(c.toInt)))).get
-          val meaning = insert(db, cursor.getString(2).map(c => registers.SymbolPosition(allSymbolsReverse(c.toInt)))).get
           val jaWord = insert(db, registers.Word(japaneseKey)).get
-          val esWord = insert(db, registers.Word(spanishKey)).get
           insert(db, registers.WordRepresentation(jaWord, kanjiKey, written))
           insert(db, registers.WordRepresentation(jaWord, kanaKey, kana))
-          insert(db, registers.WordRepresentation(esWord, spanishAlphabetKey, meaning))
 
           val concept = insert(db, registers.Concept(cursor.getString(0))).get
           insert(db, registers.WordConcept(jaWord, concept))
-          insert(db, registers.WordConcept(esWord, concept))
+
+          val givenMeaning = cursor.getString(2)
+          val meanings = {
+            if (givenMeaning.indexOf("(") >= 0 || givenMeaning.indexOf(")") >= 0 || givenMeaning.indexOf("/") >= 0 || givenMeaning.indexOf(",") < 0) {
+              Array(givenMeaning)
+            }
+            else {
+              givenMeaning.split(",").map(_.trim)
+            }
+          }
+
+          for (meaning <- meanings) {
+            // TODO: Avoid adding symbols and word if it already exists (synonyms)
+            val symbolArray = insert(db, meaning.map(c => registers.SymbolPosition(allSymbolsReverse(c.toInt)))).get
+            val esWord = insert(db, registers.Word(spanishKey)).get
+
+            insert(db, registers.WordRepresentation(esWord, spanishAlphabetKey, symbolArray))
+            insert(db, registers.WordConcept(esWord, concept))
+          }
         } while(cursor.moveToNext())
       }
     } finally {
