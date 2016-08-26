@@ -380,6 +380,13 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
         assert(jpAlphabetKeys.size == 2)
         val kanaKey = (jpAlphabetKeys - kanjiKey).head
 
+        val representations = scala.collection.mutable.Map[String, registers.WordRepresentation]()
+        for (repr <- getMapFor(db, registers.WordRepresentation, AlphabetReferenceField(spanishAlphabetKey)).values) {
+          val str = getStringArray(db,
+            registers.SymbolPosition, repr.symbolArray, registers.SymbolReferenceFieldDefinition)
+          representations(str) = repr
+        }
+
         do {
           val written = insert(db, cursor.getString(0).map(c => registers.SymbolPosition(allSymbolsReverse(c.toInt)))).get
           val kana = insert(db, cursor.getString(1).map(c => registers.SymbolPosition(allSymbolsReverse(c.toInt)))).get
@@ -400,13 +407,14 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
             }
           }
 
-          val representations = getMapFor(db, registers.WordRepresentation, AlphabetReferenceField(spanishAlphabetKey)).values
           for (meaning <- meanings) {
-            val reprOpt = representations.find(repr => getStringArray(db, registers.SymbolPosition, repr.symbolArray, registers.SymbolReferenceFieldDefinition) == meaning)
+            val reprOpt = representations.get(meaning)
             val esWord = if (reprOpt.isEmpty) {
               val symbolArray = insert(db, meaning.map(c => registers.SymbolPosition(allSymbolsReverse(c.toInt)))).get
               val word = insert(db, registers.Word(spanishKey)).get
-              insert(db, registers.WordRepresentation(word, spanishAlphabetKey, symbolArray))
+              val repr = registers.WordRepresentation(word, spanishAlphabetKey, symbolArray)
+              representations(meaning) = repr
+              insert(db, repr)
               word
             }
             else {
