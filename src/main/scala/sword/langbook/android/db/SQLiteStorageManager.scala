@@ -6,7 +6,7 @@ import android.database.sqlite.{SQLiteDatabase, SQLiteOpenHelper}
 import android.util.Log
 import sword.db.Register.CollectionId
 import sword.db._
-import sword.langbook.db.registers.LanguageReferenceField
+import sword.langbook.db.registers.{WordReferenceFieldDefinition, LanguageReferenceField}
 
 import scala.collection.mutable.ListBuffer
 
@@ -882,5 +882,116 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
   override def getArray[R <: Register](registerDefinition: ArrayableRegisterDefinition[R], id: Register.CollectionId) :Seq[R] = {
     withReadableDatabase(getArray(_, registerDefinition, id))
+  }
+
+  override def getAlphabetSet(language: ForeignKeyField, wordRefFieldDef: ForeignKeyFieldDefinition): Set[Key] = {
+
+    val wordTable = sword.langbook.db.registers.Word
+    val reprTable = sword.langbook.db.registers.WordRepresentation
+
+    val wordTableName = tableName(wordTable)
+    val reprTableName = tableName(reprTable)
+
+    val alphabetFieldName = fieldName(reprTable, sword.langbook.db.registers.AlphabetReferenceFieldDefinition)
+    val languageFieldName = fieldName(wordTable, language.definition)
+
+    val wordRefFieldName = fieldName(reprTable, wordRefFieldDef)
+    val languageKey = language.key.index
+
+    val query = s"SELECT $reprTableName.$alphabetFieldName FROM $reprTableName JOIN $wordTableName ON $wordTableName.${SQLiteStorageManager.idKey} = $reprTableName.$wordRefFieldName WHERE $wordTableName.$languageFieldName = $languageKey"
+    val set = scala.collection.mutable.Set[Key]()
+
+    withReadableDatabase { db =>
+      val cursor = db.rawQuery(query, null)
+
+      var count = 0
+      if (cursor != null) try {
+        count = cursor.getCount
+        if (cursor.getCount > 0 && cursor.moveToFirst()) {
+          do {
+            set += obtainKey(sword.langbook.db.registers.Alphabet, 0, cursor.getInt(0))
+          } while(cursor.moveToNext())
+        }
+      } finally {
+        cursor.close()
+      }
+    }
+
+    set.toSet
+  }
+
+  override def getStringArray[R <: Register](registerDefinition: ArrayableRegisterDefinition[R],
+      id: Register.CollectionId, matcher: ForeignKeyFieldDefinition) :String = {
+
+    withReadableDatabase { db =>
+      val params = getArrayParams(registerDefinition)
+
+      val symbolTableName = tableName(matcher.target)
+      val symbolPositionTableName = params.table
+
+      val symbolRefFieldName = fieldName(registerDefinition, matcher)
+
+      val symbolUnicodeFieldDef = sword.db.UnicodeFieldDefinition
+      val symbolUnicodeFieldName = fieldName(matcher.target, symbolUnicodeFieldDef)
+
+      val query = s"SELECT $symbolTableName.$symbolUnicodeFieldName FROM $symbolPositionTableName JOIN $symbolTableName ON $symbolTableName.${SQLiteStorageManager.idKey} = $symbolPositionTableName.$symbolRefFieldName WHERE $symbolPositionTableName.${SQLiteStorageManager.collKey} = $id ORDER BY $symbolPositionTableName.${SQLiteStorageManager.idKey} ASC"
+      val cursor = db.rawQuery(query, null)
+
+      val s = new StringBuilder()
+      var count = 0
+      if (cursor != null) try {
+        count = cursor.getCount
+        if (cursor.getCount > 0 && cursor.moveToFirst()) {
+          do {
+            s.append(cursor.getInt(0).toChar)
+          } while(cursor.moveToNext())
+        }
+      } finally {
+        cursor.close()
+      }
+
+      s.toString
+    }
+  }
+
+  override def isConceptDuplicated(alphabet: Key): Boolean = {
+
+    val conceptTable = sword.langbook.db.registers.WordConcept
+    val reprTable = sword.langbook.db.registers.WordRepresentation
+    val joinFieldDef = sword.langbook.db.registers.WordReferenceFieldDefinition
+
+    val conceptTableName = tableName(conceptTable)
+    val reprTableName = tableName(reprTable)
+
+    val conceptWordFieldName = fieldName(conceptTable, joinFieldDef)
+    val reprWordFieldName = fieldName(reprTable, joinFieldDef)
+
+    val conceptFieldName = fieldName(conceptTable, sword.langbook.db.registers.ConceptReferenceFieldDefinition)
+    val alphabetFieldName = fieldName(reprTable, sword.langbook.db.registers.AlphabetReferenceFieldDefinition)
+
+    val alphabetKey = alphabet.index
+
+    var repeated = false
+    withReadableDatabase { db =>
+      val query = s"SELECT $conceptTableName.$conceptFieldName FROM $conceptTableName JOIN $reprTableName ON $conceptTableName.$conceptWordFieldName = $reprTableName.$reprWordFieldName WHERE $reprTableName.$alphabetFieldName = $alphabetKey"
+      val cursor = db.rawQuery(query, null)
+
+      val set = scala.collection.mutable.Set[Register.Index]()
+      var count = 0
+      if (cursor != null) try {
+        count = cursor.getCount
+        if (cursor.getCount > 0 && cursor.moveToFirst()) {
+          do {
+            val conceptKey = cursor.getInt(0)
+            if (set(conceptKey)) repeated = true
+            else set += conceptKey
+          } while(cursor.moveToNext() && !repeated)
+        }
+      } finally {
+        cursor.close()
+      }
+    }
+
+    repeated
   }
 }
