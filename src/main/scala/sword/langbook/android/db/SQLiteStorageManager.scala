@@ -6,7 +6,8 @@ import android.database.sqlite.{SQLiteDatabase, SQLiteOpenHelper}
 import android.util.Log
 import sword.db.Register.CollectionId
 import sword.db._
-import sword.langbook.db.registers.{AlphabetReferenceField, WordReferenceFieldDefinition, LanguageReferenceField}
+import sword.langbook.db.registers
+import sword.langbook.db.registers.{SymbolArrayReferenceFieldDefinition, AlphabetReferenceField, WordReferenceFieldDefinition, LanguageReferenceField}
 
 import scala.collection.mutable.ListBuffer
 
@@ -971,23 +972,63 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val symbolUnicodeFieldDef = sword.db.UnicodeFieldDefinition
     val symbolUnicodeFieldName = fieldName(matcher.target, symbolUnicodeFieldDef)
 
-    val query = s"SELECT $symbolTableName.$symbolUnicodeFieldName FROM $symbolPositionTableName JOIN $symbolTableName ON $symbolTableName.${SQLiteStorageManager.idKey} = $symbolPositionTableName.$symbolRefFieldName WHERE $symbolPositionTableName.${SQLiteStorageManager.collKey} = $id ORDER BY $symbolPositionTableName.${SQLiteStorageManager.idKey} ASC"
+    val symbolCharFieldDef = sword.db.CharSequenceFieldDefinition
+    val symbolCharFieldName = fieldName(matcher.target, symbolCharFieldDef)
+
+    val query = s"SELECT group_concat($symbolTableName.$symbolCharFieldName,'') FROM $symbolPositionTableName JOIN $symbolTableName ON $symbolTableName.${SQLiteStorageManager.idKey} = $symbolPositionTableName.$symbolRefFieldName WHERE $symbolPositionTableName.${SQLiteStorageManager.collKey} = $id GROUP BY $symbolPositionTableName.${SQLiteStorageManager.collKey} ORDER BY $symbolPositionTableName.${SQLiteStorageManager.idKey} ASC"
     val cursor = db.rawQuery(query, null)
 
-    val s = new StringBuilder()
-    var count = 0
+    if (cursor != null) {
+      try {
+        if (cursor.getCount == 1 && cursor.moveToFirst()) cursor.getString(0)
+        else ""
+      } finally {
+        cursor.close()
+      }
+    }
+    else ""
+  }
+
+  override def allStringArray: Map[Key, List[String]] = {
+    withReadableDatabase(allStringArray)
+  }
+
+  private def allStringArray(db: SQLiteDatabase): Map[Key, List[String]] = {
+
+    val registerDefinition = registers.SymbolPosition
+    val params = getArrayParams(registerDefinition)
+    val matcher = registers.SymbolReferenceFieldDefinition
+
+    val reprTable = sword.langbook.db.registers.WordRepresentation
+    val reprTableName = tableName(reprTable)
+    val symbolTableName = tableName(matcher.target)
+    val symbolPositionTableName = params.table
+
+    val symbolRefFieldName = fieldName(registerDefinition, matcher)
+    val wordRefFieldName = fieldName(reprTable, WordReferenceFieldDefinition)
+    val arrayRefFieldName = fieldName(reprTable, SymbolArrayReferenceFieldDefinition)
+
+    val symbolCharFieldDef = sword.db.CharSequenceFieldDefinition
+    val symbolCharFieldName = fieldName(matcher.target, symbolCharFieldDef)
+
+    val query = s"SELECT $reprTableName.$wordRefFieldName,group_concat($symbolTableName.$symbolCharFieldName,'') FROM $reprTableName JOIN $symbolPositionTableName ON $reprTableName.$arrayRefFieldName = $symbolPositionTableName.${SQLiteStorageManager.collKey} JOIN $symbolTableName ON $symbolTableName.${SQLiteStorageManager.idKey} = $symbolPositionTableName.$symbolRefFieldName GROUP BY $symbolPositionTableName.${SQLiteStorageManager.collKey} ORDER BY $symbolPositionTableName.${SQLiteStorageManager.idKey} ASC"
+    val cursor = db.rawQuery(query, null)
+
+    val result = scala.collection.mutable.Map[Int, List[String]]()
     if (cursor != null) try {
-      count = cursor.getCount
       if (cursor.getCount > 0 && cursor.moveToFirst()) {
         do {
-          s.append(cursor.getInt(0).toChar)
+          val wordId = cursor.getInt(0)
+          val str = cursor.getString(1)
+          val list = str :: result.getOrElse(wordId, List())
+          result(wordId) = list
         } while(cursor.moveToNext())
       }
     } finally {
       cursor.close()
     }
 
-    s.toString
+    result.map { case (x,y) => (obtainKey(sword.langbook.db.registers.Word, 0, x),y) }.toMap
   }
 
   override def isConceptDuplicated(alphabet: Key): Boolean = {
