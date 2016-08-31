@@ -20,6 +20,14 @@ case class LinkedStorageManagerTests(instrumentation: Instrumentation) {
     s"Found ${allWords.size} words in the database. Map for symbol arrays has ${allTexts.size} entries"
   }
 
+  def alphabetsWhereSymbolIncluded: String = {
+    val manager = createManager
+    val symbol = manager.symbols.values.head
+    val alphabets = symbol.alphabetsWhereIncluded
+
+    s"Symbol ${symbol.unicode.toChar} has been found in ${alphabets.size} alphabets"
+  }
+
   def possibleInterAlphabetQuestions: String = {
     val manager = createManager
     val possibilities = InterAlphabetQuestion.findPossibleQuestionTypes(manager)

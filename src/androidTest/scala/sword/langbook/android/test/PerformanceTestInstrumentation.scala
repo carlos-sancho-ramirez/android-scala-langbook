@@ -115,6 +115,7 @@ class PerformanceTestInstrumentation extends Instrumentation {
       runPerformanceTest(suiteName, "possibleInterAlphabetQuestions", testsInstance.possibleInterAlphabetQuestions _)
       runPerformanceTest(suiteName, "possibleSynonymQuestions", testsInstance.possibleSynonymQuestions _)
       runPerformanceTest(suiteName, "possibleTranslationQuestions", testsInstance.possibleTranslationQuestions _)
+      runPerformanceTest(suiteName, "alphabetsWhereSymbolIncluded", testsInstance.alphabetsWhereSymbolIncluded _)
     }
 
     val results = new Bundle()

@@ -7,7 +7,7 @@ import android.util.Log
 import sword.db.Register.CollectionId
 import sword.db._
 import sword.langbook.db.registers
-import sword.langbook.db.registers.{SymbolArrayReferenceFieldDefinition, AlphabetReferenceField, WordReferenceFieldDefinition, LanguageReferenceField}
+import sword.langbook.db.registers._
 
 import scala.collection.mutable.ListBuffer
 
@@ -969,9 +969,6 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
     val symbolRefFieldName = fieldName(registerDefinition, matcher)
 
-    val symbolUnicodeFieldDef = sword.db.UnicodeFieldDefinition
-    val symbolUnicodeFieldName = fieldName(matcher.target, symbolUnicodeFieldDef)
-
     val symbolCharFieldDef = sword.db.CharSequenceFieldDefinition
     val symbolCharFieldName = fieldName(matcher.target, symbolCharFieldDef)
 
@@ -1070,5 +1067,39 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
 
     repeated
+  }
+
+  override def alphabetsWhereSymbolIncluded(symbol: Key): Set[Key] = {
+    withReadableDatabase(alphabetsWhereSymbolIncluded(_, symbol))
+  }
+
+  private def alphabetsWhereSymbolIncluded(db: SQLiteDatabase, symbol: Key): Set[Key] = {
+    val symbolPositionTable = sword.langbook.db.registers.SymbolPosition
+    val reprTable = sword.langbook.db.registers.WordRepresentation
+
+    val reprTableName = tableName(reprTable)
+    val symbolPositionTableName = tableName(symbolPositionTable)
+
+    val arrayRefFieldName = fieldName(reprTable, SymbolArrayReferenceFieldDefinition)
+    val alphabetFieldName = fieldName(reprTable, AlphabetReferenceFieldDefinition)
+
+    val symbolFieldName = fieldName(symbolPositionTable, SymbolReferenceFieldDefinition)
+    val symbolId = symbol.index
+
+    val query = s"SELECT $reprTableName.$alphabetFieldName FROM $reprTableName JOIN $symbolPositionTableName ON $reprTableName.$arrayRefFieldName = $symbolPositionTableName.${SQLiteStorageManager.collKey} WHERE $symbolPositionTableName.$symbolFieldName = $symbolId"
+    val cursor = db.rawQuery(query, null)
+
+    val result = scala.collection.mutable.Set[Int]()
+    if (cursor != null) try {
+      if (cursor.getCount > 0 && cursor.moveToFirst()) {
+        do {
+          result += cursor.getInt(0)
+        } while(cursor.moveToNext())
+      }
+    } finally {
+      cursor.close()
+    }
+
+    result.map(obtainKey(registers.Alphabet, 0, _)).toSet
   }
 }
