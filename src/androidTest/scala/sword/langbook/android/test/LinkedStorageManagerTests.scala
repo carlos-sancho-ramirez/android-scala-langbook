@@ -3,7 +3,7 @@ package sword.langbook.android.test
 import android.app.Instrumentation
 import sword.langbook.{TranslationQuestion, SynonymQuestion, InterAlphabetQuestion}
 import sword.langbook.android.db.SQLiteStorageManager
-import sword.langbook.db.LinkedStorageManager
+import sword.langbook.db.{Word, LinkedStorageManager}
 
 case class LinkedStorageManagerTests(instrumentation: Instrumentation) {
 
@@ -15,9 +15,9 @@ case class LinkedStorageManagerTests(instrumentation: Instrumentation) {
   def allWordTexts: String = {
     val manager = createManager
     val allWords = manager.words.values.toVector
-    val allTexts = allWords.map(word => (word, word.text.values.toList)).toMap
+    val allTexts = manager.storageManager.allStringArray.map { case (x,y) => (Word(x), y)}
 
-    s"Found ${allWords.size} words in the database. Retrieved ${allTexts.size} strings"
+    s"Found ${allWords.size} words in the database. Map for symbol arrays has ${allTexts.size} entries"
   }
 
   def possibleInterAlphabetQuestions: String = {
