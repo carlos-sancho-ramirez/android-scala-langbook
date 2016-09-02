@@ -1069,11 +1069,13 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     repeated
   }
 
-  override def alphabetsWhereSymbolIncluded(symbol: Key): Set[Key] = {
-    withReadableDatabase(alphabetsWhereSymbolIncluded(_, symbol))
-  }
+  private def keySetForAlphabetSymbolMatching(
+      db: SQLiteDatabase,
+      targetRegDef: RegisterDefinition[Register],
+      targetFieldDef: ForeignKeyFieldDefinition,
+      filterRegDef: RegisterDefinition[Register],
+      filter: ForeignKeyField): Set[Key] = {
 
-  private def alphabetsWhereSymbolIncluded(db: SQLiteDatabase, symbol: Key): Set[Key] = {
     val symbolPositionTable = sword.langbook.db.registers.SymbolPosition
     val reprTable = sword.langbook.db.registers.WordRepresentation
 
@@ -1081,12 +1083,17 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val symbolPositionTableName = tableName(symbolPositionTable)
 
     val arrayRefFieldName = fieldName(reprTable, SymbolArrayReferenceFieldDefinition)
-    val alphabetFieldName = fieldName(reprTable, AlphabetReferenceFieldDefinition)
 
-    val symbolFieldName = fieldName(symbolPositionTable, SymbolReferenceFieldDefinition)
-    val symbolId = symbol.index
+    val targetTableName = tableName(targetRegDef)
+    val targetFieldName = fieldName(targetRegDef, targetFieldDef)
+    val target = s"$targetTableName.$targetFieldName"
 
-    val query = s"SELECT $reprTableName.$alphabetFieldName FROM $reprTableName JOIN $symbolPositionTableName ON $reprTableName.$arrayRefFieldName = $symbolPositionTableName.${SQLiteStorageManager.collKey} WHERE $symbolPositionTableName.$symbolFieldName = $symbolId"
+    val filterTableName = tableName(filterRegDef)
+    val filterFieldName = fieldName(filterRegDef, filter.definition)
+    val filterId = filter.key.index
+    val filterClause = s"$filterTableName.$filterFieldName = $filterId"
+
+    val query = s"SELECT $target FROM $reprTableName JOIN $symbolPositionTableName ON $reprTableName.$arrayRefFieldName = $symbolPositionTableName.${SQLiteStorageManager.collKey} WHERE $filterClause"
     val cursor = db.rawQuery(query, null)
 
     val result = scala.collection.mutable.Set[Int]()
@@ -1100,7 +1107,19 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
       cursor.close()
     }
 
-    result.map(obtainKey(registers.Alphabet, 0, _)).toSet
+    result.map(obtainKey(targetFieldDef.target, 0, _)).toSet
+  }
+
+  override def alphabetsWhereSymbolIncluded(symbol: Key): Set[Key] = {
+    withReadableDatabase(alphabetsWhereSymbolIncluded(_, symbol))
+  }
+
+  private def alphabetsWhereSymbolIncluded(db: SQLiteDatabase, symbol: Key): Set[Key] = {
+    keySetForAlphabetSymbolMatching(db,
+        registers.WordRepresentation,
+        registers.AlphabetReferenceFieldDefinition,
+        registers.SymbolPosition,
+        registers.SymbolReferenceField(symbol))
   }
 
   override def allSymbolsInAlphabet(alphabet: Key): Set[Key] = {
@@ -1108,32 +1127,10 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   }
 
   private def allSymbolsInAlphabet(db: SQLiteDatabase, alphabet: Key): Set[Key] = {
-    val symbolPositionTable = sword.langbook.db.registers.SymbolPosition
-    val reprTable = sword.langbook.db.registers.WordRepresentation
-
-    val reprTableName = tableName(reprTable)
-    val symbolPositionTableName = tableName(symbolPositionTable)
-
-    val arrayRefFieldName = fieldName(reprTable, SymbolArrayReferenceFieldDefinition)
-    val alphabetFieldName = fieldName(reprTable, AlphabetReferenceFieldDefinition)
-
-    val symbolFieldName = fieldName(symbolPositionTable, SymbolReferenceFieldDefinition)
-    val alphabetId = alphabet.index
-
-    val query = s"SELECT $symbolPositionTableName.$symbolFieldName FROM $reprTableName JOIN $symbolPositionTableName ON $reprTableName.$arrayRefFieldName = $symbolPositionTableName.${SQLiteStorageManager.collKey} WHERE $reprTableName.$alphabetFieldName = $alphabetId"
-    val cursor = db.rawQuery(query, null)
-
-    val result = scala.collection.mutable.Set[Int]()
-    if (cursor != null) try {
-      if (cursor.getCount > 0 && cursor.moveToFirst()) {
-        do {
-          result += cursor.getInt(0)
-        } while (cursor.moveToNext())
-      }
-    } finally {
-      cursor.close()
-    }
-
-    result.map(obtainKey(registers.Symbol, 0, _)).toSet
+    keySetForAlphabetSymbolMatching(db,
+      registers.SymbolPosition,
+      registers.SymbolReferenceFieldDefinition,
+      registers.WordRepresentation,
+      registers.AlphabetReferenceField(alphabet))
   }
 }
