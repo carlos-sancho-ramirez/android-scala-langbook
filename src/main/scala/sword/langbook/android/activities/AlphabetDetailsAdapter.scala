@@ -21,7 +21,7 @@ object AlphabetDetailsAdapter {
 }
 
 case class AlphabetDetailsAdapter(activity: Activity, alphabet: Alphabet, spanCount: Int) extends RecyclerView.Adapter[SymbolViewHolder] {
-  val symbols = alphabet.symbols.toVector
+  val symbols = alphabet.symbols.toSeq.sortWith(_.unicode < _.unicode)
   val chars = symbols.map(_.unicode.toChar)
   override val getItemCount = symbols.size
 
