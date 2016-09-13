@@ -5,6 +5,7 @@ import android.database.Cursor
 import android.database.sqlite.{SQLiteDatabase, SQLiteOpenHelper}
 import android.util.Log
 import sword.db.Register.CollectionId
+import sword.db.StorageManager.LanguageCodes
 import sword.db._
 import sword.langbook.db.registers
 import sword.langbook.db.registers._
@@ -24,13 +25,6 @@ object SQLiteStorageManager {
   val kanjiAlphabetHint = "Kanji alphabet"
   val englishAlphabetHint = "English alphabet"
   val spanishAlphabetHint = "Spanish alphabet"
-
-  // This is required in order that app can identify languages when selecting quizzes.
-  // It should not be required if the app was generic enough.
-  // TODO: Remove these codes when the app does not require them
-  val englishCode = "en"
-  val spanishCode = "es"
-  val japaneseCode = "ja"
 }
 
 class SQLiteStorageManager(context :Context, dbName: String, override val registerDefinitions :Seq[RegisterDefinition[Register]])
@@ -218,9 +212,9 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     insert(db, registers.ConceptTypeRelation(spanishConceptKey, languageConceptKey))
     insert(db, registers.ConceptTypeRelation(japaneseConceptKey, languageConceptKey))
 
-    val englishKey = insert(db, registers.Language(englishConceptKey, SQLiteStorageManager.englishCode, enAlphabetKey)).get
-    val spanishKey = insert(db, registers.Language(spanishConceptKey, SQLiteStorageManager.spanishCode, spAlphabetKey)).get
-    val japaneseKey = insert(db, registers.Language(japaneseConceptKey, SQLiteStorageManager.japaneseCode, kanjiAlphabetKey)).get
+    val englishKey = insert(db, registers.Language(englishConceptKey, LanguageCodes.english, enAlphabetKey)).get
+    val spanishKey = insert(db, registers.Language(spanishConceptKey, LanguageCodes.spanish, spAlphabetKey)).get
+    val japaneseKey = insert(db, registers.Language(japaneseConceptKey, LanguageCodes.japanese, kanjiAlphabetKey)).get
 
     val languageEnSymbolArrayCollection = insert(db, enLanguageText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
     val languageSpSymbolArrayCollection = insert(db, spLanguageText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
