@@ -945,6 +945,41 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     set.toSet
   }
 
+  override def getJointSet[R <: Register](sourceRegDef: RegisterDefinition[Register], targetRegDef: RegisterDefinition[R], filter: ForeignKeyField, join: ForeignKeyFieldDefinition): Set[R] = {
+
+    val sourceTableName = tableName(sourceRegDef)
+    val targetTableName = tableName(targetRegDef)
+
+    val allColumns = targetRegDef.fields.map(f => targetTableName + '.' + fieldName(targetRegDef, f)).mkString(", ")
+
+    val sourceJoinFieldName = sourceTableName + '.' + fieldName(sourceRegDef, join)
+    val targetJoinFieldName = targetTableName + '.' + fieldName(targetRegDef, join)
+
+    val filterFieldName = sourceTableName + '.' + fieldName(sourceRegDef, filter.definition)
+    val filterKey = filter.key.index
+
+    val query = s"SELECT $allColumns FROM $sourceTableName JOIN $targetTableName ON $sourceJoinFieldName = $targetJoinFieldName WHERE $filterFieldName = $filterKey"
+    val set = scala.collection.mutable.Set[R]()
+
+    withReadableDatabase { db =>
+      val cursor = db.rawQuery(query, null)
+
+      if (cursor != null) try {
+        if (cursor.getCount > 0 && cursor.moveToFirst()) {
+          do {
+            val fieldValues = targetRegDef.fields.indices.map(cursor.getString)
+            targetRegDef.from(fieldValues, keyExtractor).map(set += _)
+          } while(cursor.moveToNext())
+        }
+
+      } finally {
+        cursor.close()
+      }
+    }
+
+    set.toSet
+  }
+
   override def getStringArray[R <: Register](registerDefinition: ArrayableRegisterDefinition[R],
       id: Register.CollectionId, matcher: ForeignKeyFieldDefinition) :String = {
     withReadableDatabase(getStringArray(_, registerDefinition, id, matcher))
