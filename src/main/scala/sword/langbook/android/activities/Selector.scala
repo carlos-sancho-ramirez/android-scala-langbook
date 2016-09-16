@@ -1,5 +1,7 @@
 package sword.langbook.android.activities
 
+import java.util.Locale
+
 import android.app.{SearchManager, Activity}
 import android.content.{Context, Intent}
 import android.os.Bundle
@@ -58,11 +60,14 @@ class Selector extends BaseActivity with AdapterView.OnItemClickListener with Se
     private def updateItems(): Unit = {
       _items = {
         if (_query.isEmpty) allItems
-        else allTexts.flatMap {
-          case (word, strings) =>
-            if (strings.exists(_.contains(_query))) Some(word)
-            else None
-        }.toVector
+        else {
+          val normalisedQuery = _query.toLowerCase(Locale.ENGLISH)
+          allTexts.flatMap {
+            case (word, strings) =>
+              if (strings.exists(_.contains(normalisedQuery))) Some(word)
+              else None
+          }.toVector
+        }
       }
 
       notifyDataSetChanged()
