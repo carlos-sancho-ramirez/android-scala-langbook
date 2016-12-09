@@ -35,7 +35,6 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   var _lastQueryMillis: Long = 0
 
   // The following code is copied from AbstractStorageManager, and it should be centralised
-  // The following code is copied from AbstractStorageManager, and it should be centralised
   // TODO: Centralise this code
   if (registerDefinitions.toSet.size < registerDefinitions.size) {
     throw new IllegalArgumentException("Duplicated register definitions are not allowed")
@@ -311,6 +310,33 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
   }
 
+  private def currentSymbolsInDatabase(db: SQLiteDatabase): Map[Register.UnicodeType, Key] = {
+    //val symbolMap = keysFor(db, registers.Symbol).flatMap(k => get(db, k).map((k,_))).toMap
+    //symbolMap.flatMap {
+    //  case (key, reg) =>
+    //    reg.fields.collectFirst {
+    //      case f: UnicodeField => f.value
+    //    }.map((_, key))
+    //}
+
+    getMapFor(db, registers.Symbol).map { case (a,b) => (b.unicode, a) }.toMap
+  }
+
+  private def insertNewSymbolsAndRetrieveSymbolMap(db: SQLiteDatabase, cursor: Cursor): Map[Register.UnicodeType, Key] = {
+    val newSymbols = scala.collection.mutable.Set[Char]()
+    do {
+      newSymbols ++= cursor.getString(0) ++= cursor.getString(1) ++= cursor.getString(2)
+    } while(cursor.moveToNext())
+
+    val currentSymbols = currentSymbolsInDatabase(db)
+
+    currentSymbols ++ (for {
+      missingSymbol <- newSymbols.map(_.toInt).toSet.diff(currentSymbols.keys.toSet)
+    } yield {
+      (missingSymbol, insert(db, registers.Symbol(missingSymbol)).get)
+    })
+  }
+
   private def fromDbVersion3(db: SQLiteDatabase): Unit = {
     import sword.langbook.db.registers
 
@@ -319,49 +345,19 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
     if (cursor != null) try {
       if (cursor.getCount > 0 && cursor.moveToFirst()) {
-        val symbols = scala.collection.mutable.Set[Char]()
-        do {
-          symbols ++= cursor.getString(0) ++= cursor.getString(1) ++= cursor.getString(2)
-        } while(cursor.moveToNext())
-
-        val currentSymbols = keysFor(db, registers.Symbol).flatMap(k => get(db, k).map((k,_))).toMap.flatMap { case (key, reg) =>
-          reg.fields.collectFirst { case f: UnicodeField => f.value }.map((key, _))
-        }
-
-        val allSymbols = currentSymbols ++ (for {
-          missingSymbol <- symbols.map(_.toInt).toSet.diff(currentSymbols.values.toSet)
-        } yield {
-          val keyOpt = insert(db, registers.Symbol(missingSymbol))
-          (keyOpt.get, missingSymbol)
-        })
+        val allSymbols = insertNewSymbolsAndRetrieveSymbolMap(db, cursor)
 
         if (!cursor.moveToFirst()) return
 
-        val allSymbolsReverse = allSymbols.map { case (a,b) => (b, a) }
-
-        val (spanishKey, spanishAlphabetKey) = keysFor(db, registers.Language).flatMap(k => get(db, k).map((k,_))).find {
-          case (_,reg) =>
-            reg.fields.collectFirst {
-              case f: LanguageCodeField if f.code == "es" => true
-            }.isDefined
-        }.flatMap {
-          case (languageKey, reg) =>
-            reg.fields.collectFirst {
-              case f: ForeignKeyField if f.definition.target == registers.Alphabet => f.key
-            }.map((languageKey, _))
+        val languages = getMapFor(db, registers.Language)
+        val (spanishKey, spanishAlphabetKey) = languages.collectFirst {
+          case (key, reg) if reg.code == "es" => (key, reg.preferredAlphabet)
         }.get
 
-        val (japaneseKey, kanjiKey) = keysFor(db, registers.Language).flatMap(k => get(db, k).map((k,_))).find {
-          case (_,reg) =>
-            reg.fields.collectFirst {
-              case f: LanguageCodeField if f.code == "ja" => true
-            }.isDefined
-        }.flatMap {
-          case (languageKey, reg) =>
-            reg.fields.collectFirst {
-              case f: ForeignKeyField if f.definition.target == registers.Alphabet => f.key
-            }.map((languageKey, _))
+        val (japaneseKey, kanjiKey) = languages.collectFirst {
+          case (key, reg) if reg.code == "ja" => (key, reg.preferredAlphabet)
         }.get
+
         Log.i("kana extraction", "japaneseKey is " + japaneseKey.encoded)
         Log.i("kana extraction", "kanjiKey is " + kanjiKey.encoded)
 
@@ -383,8 +379,8 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
         }
 
         do {
-          val written = insert(db, cursor.getString(0).map(c => registers.SymbolPosition(allSymbolsReverse(c.toInt)))).get
-          val kana = insert(db, cursor.getString(1).map(c => registers.SymbolPosition(allSymbolsReverse(c.toInt)))).get
+          val written = insert(db, cursor.getString(0).map(c => registers.SymbolPosition(allSymbols(c.toInt)))).get
+          val kana = insert(db, cursor.getString(1).map(c => registers.SymbolPosition(allSymbols(c.toInt)))).get
           val jaWord = insert(db, registers.Word(japaneseKey)).get
           insert(db, registers.WordRepresentation(jaWord, kanjiKey, written))
           insert(db, registers.WordRepresentation(jaWord, kanaKey, kana))
@@ -405,7 +401,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
           for (meaning <- meanings) {
             val reprOpt = representations.get(meaning)
             val esWord = if (reprOpt.isEmpty) {
-              val symbolArray = insert(db, meaning.map(c => registers.SymbolPosition(allSymbolsReverse(c.toInt)))).get
+              val symbolArray = insert(db, meaning.map(c => registers.SymbolPosition(allSymbols(c.toInt)))).get
               val word = insert(db, registers.Word(spanishKey)).get
               val repr = registers.WordRepresentation(word, spanishAlphabetKey, symbolArray)
               representations(meaning) = repr
