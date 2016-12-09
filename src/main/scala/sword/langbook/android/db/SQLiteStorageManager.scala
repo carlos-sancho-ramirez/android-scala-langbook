@@ -7,6 +7,7 @@ import android.util.Log
 import sword.db.Register.CollectionId
 import sword.db.StorageManager.LanguageCodes
 import sword.db._
+import sword.langbook.android.VersionUtils
 import sword.langbook.db.registers
 import sword.langbook.db.registers._
 
@@ -594,6 +595,26 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     exec(db, s"INSERT INTO ${tableName(register)} (${SQLiteStorageManager.collKey}, $keys) VALUES ($coll, $values)")
   }
 
+  private def insert(db: SQLiteDatabase, collId: Register.CollectionId, registers: Traversable[Register]): Unit = {
+    if (VersionUtils.SQLite.isAtLeast3_7_11) {
+      val regDef = registers.head.definition
+      val keys = regDef.fields.map(fieldName(regDef,_)).mkString(", ")
+      val allValues = {
+        (for (reg <- registers) yield {
+          val values = reg.fields.map(sqlValue).mkString(", ")
+          s"($collId, $values)"
+        }) mkString ", "
+      }
+
+      exec(db, s"INSERT INTO ${tableName(regDef)} (${SQLiteStorageManager.collKey}, $keys) VALUES $allValues")
+    }
+    else {
+      for (register <- registers) {
+        insert(db, collId, register)
+      }
+    }
+  }
+
   private def insert(db: SQLiteDatabase, registers: Traversable[Register]): Option[CollectionId] = {
     var collId = 1
     val cursor = query(db, tableName(registers.head.definition), Array(SQLiteStorageManager.collKey),
@@ -610,9 +631,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
       cursor.close()
     }
 
-    for (register <- registers) {
-      insert(db, collId, register)
-    }
+    insert(db, collId, registers)
     Some(collId)
   }
 
