@@ -380,14 +380,8 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
         }
 
         do {
-          val written = insert(db, cursor.getString(0).map(c => registers.SymbolPosition(allSymbols(c.toInt)))).get
-          val kana = insert(db, cursor.getString(1).map(c => registers.SymbolPosition(allSymbols(c.toInt)))).get
-          val jaWord = insert(db, registers.Word(japaneseKey)).get
-          insert(db, registers.WordRepresentation(jaWord, kanjiKey, written))
-          insert(db, registers.WordRepresentation(jaWord, kanaKey, kana))
-
-          val concept = insert(db, registers.Concept(cursor.getString(0))).get
-          insert(db, registers.WordConcept(jaWord, concept))
+          val writtenSymbols = cursor.getString(0).map(c => registers.SymbolPosition(allSymbols(c.toInt)))
+          val kanaSymbols = cursor.getString(1).map(c => registers.SymbolPosition(allSymbols(c.toInt)))
 
           val givenMeaning = cursor.getString(2)
           val meanings = {
@@ -399,12 +393,21 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
             }
           }
 
+          val symbolArrays = writtenSymbols :: kanaSymbols :: meanings.map(_.map(c => registers.SymbolPosition(allSymbols(c.toInt)))).toList
+          val ids = insertCollections(db, symbolArrays).iterator
+
+          val jaWord = insert(db, registers.Word(japaneseKey)).get
+          insert(db, registers.WordRepresentation(jaWord, kanjiKey, ids.next))
+          insert(db, registers.WordRepresentation(jaWord, kanaKey, ids.next))
+
+          val concept = insert(db, registers.Concept(cursor.getString(0))).get
+          insert(db, registers.WordConcept(jaWord, concept))
+
           for (meaning <- meanings) {
             val reprOpt = representations.get(meaning)
             val esWord = if (reprOpt.isEmpty) {
-              val symbolArray = insert(db, meaning.map(c => registers.SymbolPosition(allSymbols(c.toInt)))).get
               val word = insert(db, registers.Word(spanishKey)).get
-              val repr = registers.WordRepresentation(word, spanishAlphabetKey, symbolArray)
+              val repr = registers.WordRepresentation(word, spanishAlphabetKey, ids.next())
               representations(meaning) = repr
               insert(db, repr)
               word
@@ -615,24 +618,56 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
   }
 
-  private def insert(db: SQLiteDatabase, registers: Traversable[Register]): Option[CollectionId] = {
-    var collId = 1
-    val cursor = query(db, tableName(registers.head.definition), Array(SQLiteStorageManager.collKey),
-        null, null)
+  private def maxCollectionId(db: SQLiteDatabase, regDef: RegisterDefinition[Register]): Register.CollectionId = {
+    var collId = 0
+    val cursor = query(db, tableName(regDef), Array(SQLiteStorageManager.collKey), null, null)
 
     if (cursor != null) try {
       if (cursor.getCount > 0 && cursor.moveToFirst()) {
         do {
           val thisCollId = cursor.getInt(0)
-          if (thisCollId >= collId) collId = thisCollId + 1
+          if (thisCollId > collId) collId = thisCollId
         } while(cursor.moveToNext())
       }
     } finally {
       cursor.close()
     }
 
+    collId
+  }
+
+  private def insert(db: SQLiteDatabase, registers: Traversable[Register]): Option[CollectionId] = {
+    val collId = maxCollectionId(db, registers.head.definition) + 1
     insert(db, collId, registers)
     Some(collId)
+  }
+
+  private def insertCollections(db: SQLiteDatabase, collections: Traversable[Traversable[Register]]): Seq[Register.CollectionId] = {
+    val maxId = maxCollectionId(db, collections.head.head.definition)
+    var id = maxId
+    if (VersionUtils.SQLite.isAtLeast3_7_11) {
+      val regDef = collections.head.head.definition
+      val keys = regDef.fields.map(fieldName(regDef,_)).mkString(", ")
+
+      val allValues = (for (registers <- collections) yield {
+        id += 1
+        (for (reg <- registers) yield {
+          val values = reg.fields.map(sqlValue).mkString(", ")
+          s"($id, $values)"
+        }) mkString ", "
+      }).mkString(", ")
+
+      exec(db, s"INSERT INTO ${tableName(regDef)} (${SQLiteStorageManager.collKey}, $keys) VALUES $allValues")
+
+      (maxId + 1) to id
+    }
+    else {
+      (for (registers <- collections) yield {
+        id += 1
+        insert(db, id, registers)
+        id
+      }).toList
+    }
   }
 
   private def keysFor(db :SQLiteDatabase, regDef :RegisterDefinition[Register], whereClause: String) :Set[Key] = {
