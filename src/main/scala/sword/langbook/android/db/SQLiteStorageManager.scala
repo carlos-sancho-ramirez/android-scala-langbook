@@ -414,13 +414,40 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
           // Check if the text is already in the database and reuses it if possible
           val wordTexts = writtenText :: kanaText :: meaningTexts.toList
-          val idIterator = insertSymbolArraysAndReturnIds(db, wordTexts, allSymbols, texts).iterator
+          val ids = insertSymbolArraysAndReturnIds(db, wordTexts, allSymbols, texts)
+          val idIterator = ids.iterator
 
           val jaWord = insert(db, registers.Word(japaneseKey)).get
           insert(db, registers.WordRepresentation(jaWord, kanjiKey, idIterator.next))
           insert(db, registers.WordRepresentation(jaWord, kanaKey, idIterator.next))
 
-          val concept = insert(db, registers.Concept(cursor.getString(0))).get
+          // Check if there is another word that includes the same meanings and that
+          // has only a concept assigned to it. If so, it is understood that both words
+          // are synonym and the same concept should be reused. If not, a new concept should be
+          // created
+          val wordsWithMeanings = ids.drop(2).map(id => getMapFor(db, registers.WordRepresentation, SymbolArrayReferenceField(id)).values.map(_.word.index).toSet)
+          val wordsWithMeaning = wordsWithMeanings.reduce(_.intersect(_))
+          val spanishTextsLength = meaningTexts.length
+          val wordsMatchingMeanings = wordsWithMeaning.filter { wordIndex =>
+            val wordKey = obtainKey(registers.Word, 0, wordIndex)
+            getMapFor(db, registers.WordRepresentation, WordReferenceField(wordKey)).size == spanishTextsLength
+          }
+
+          var proposedConcept: Key = null
+          wordsMatchingMeanings.exists { wordIndex =>
+            val wordKey = obtainKey(registers.Word, 0, wordIndex)
+            val acceptations = getMapFor(db, registers.Acceptation, WordReferenceField(wordKey)).values
+            if (acceptations.size == 1) {
+              proposedConcept = acceptations.head.concept
+              true
+            }
+            else false
+          }
+
+          val concept = {
+            if (proposedConcept != null) proposedConcept
+            else insert(db, registers.Concept(writtenText)).get
+          }
           insert(db, registers.Acceptation(jaWord, concept))
 
           for (meaning <- meaningTexts) {
@@ -485,6 +512,11 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
   private def getMapFor[R <: Register](db: SQLiteDatabase, regDef: RegisterDefinition[R], filter: ForeignKeyField): scala.collection.Map[Key, R] = {
     val whereClause = s"${fieldName(regDef, filter)}=${filter.key.index}"
+    mapFor(regDef, query(db, _, _, whereClause, null))
+  }
+
+  private def getMapFor[R <: Register](db: SQLiteDatabase, regDef: RegisterDefinition[R], filter: CollectionReferenceField): scala.collection.Map[Key, R] = {
+    val whereClause = s"${fieldName(regDef, filter)}=${filter.collectionId}"
     mapFor(regDef, query(db, _, _, whereClause, null))
   }
 
