@@ -168,7 +168,7 @@ class WordEditor extends BaseActivity with View.OnClickListener {
         for {
           conceptKey <- conceptKeys
         } {
-          manager.insert(registers.WordConcept(wordKey, conceptKey))
+          manager.insert(registers.Acceptation(wordKey, conceptKey))
         }
       }
 

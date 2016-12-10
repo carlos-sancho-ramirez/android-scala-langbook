@@ -273,26 +273,26 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     insert(db, registers.WordRepresentation(kanaJpWord, kanjiAlphabetKey, kanaJpSymbolArrayCollection))
     insert(db, registers.WordRepresentation(kanaJpWord, kanaAlphabetKey, kanjiKanaSymbolArrayCollection))
 
-    insert(db, registers.WordConcept(languageEnWord, languageConceptKey))
-    insert(db, registers.WordConcept(languageSpWord, languageConceptKey))
-    insert(db, registers.WordConcept(languageJpWord, languageConceptKey))
-    insert(db, registers.WordConcept(englishEnWord, englishConceptKey))
-    insert(db, registers.WordConcept(englishSpWord, englishConceptKey))
-    insert(db, registers.WordConcept(englishJpWord, englishConceptKey))
-    insert(db, registers.WordConcept(spanishEnWord, spanishConceptKey))
-    insert(db, registers.WordConcept(spanishSpWord, spanishConceptKey))
-    insert(db, registers.WordConcept(spanishJpWord, spanishConceptKey))
-    insert(db, registers.WordConcept(japaneseEnWord, japaneseConceptKey))
-    insert(db, registers.WordConcept(japaneseSpWord, japaneseConceptKey))
-    insert(db, registers.WordConcept(japaneseJpWord, japaneseConceptKey))
-    insert(db, registers.WordConcept(englishEnWord, enAlphabetConceptKey))
-    insert(db, registers.WordConcept(englishSpWord, enAlphabetConceptKey))
-    insert(db, registers.WordConcept(englishJpWord, enAlphabetConceptKey))
-    insert(db, registers.WordConcept(spanishEnWord, spAlphabetConceptKey))
-    insert(db, registers.WordConcept(spanishSpWord, spAlphabetConceptKey))
-    insert(db, registers.WordConcept(spanishJpWord, spAlphabetConceptKey))
-    insert(db, registers.WordConcept(kanjiJpWord, kanjiAlphabetConceptKey))
-    insert(db, registers.WordConcept(kanaJpWord, kanaAlphabetConceptKey))
+    insert(db, registers.Acceptation(languageEnWord, languageConceptKey))
+    insert(db, registers.Acceptation(languageSpWord, languageConceptKey))
+    insert(db, registers.Acceptation(languageJpWord, languageConceptKey))
+    insert(db, registers.Acceptation(englishEnWord, englishConceptKey))
+    insert(db, registers.Acceptation(englishSpWord, englishConceptKey))
+    insert(db, registers.Acceptation(englishJpWord, englishConceptKey))
+    insert(db, registers.Acceptation(spanishEnWord, spanishConceptKey))
+    insert(db, registers.Acceptation(spanishSpWord, spanishConceptKey))
+    insert(db, registers.Acceptation(spanishJpWord, spanishConceptKey))
+    insert(db, registers.Acceptation(japaneseEnWord, japaneseConceptKey))
+    insert(db, registers.Acceptation(japaneseSpWord, japaneseConceptKey))
+    insert(db, registers.Acceptation(japaneseJpWord, japaneseConceptKey))
+    insert(db, registers.Acceptation(englishEnWord, enAlphabetConceptKey))
+    insert(db, registers.Acceptation(englishSpWord, enAlphabetConceptKey))
+    insert(db, registers.Acceptation(englishJpWord, enAlphabetConceptKey))
+    insert(db, registers.Acceptation(spanishEnWord, spAlphabetConceptKey))
+    insert(db, registers.Acceptation(spanishSpWord, spAlphabetConceptKey))
+    insert(db, registers.Acceptation(spanishJpWord, spAlphabetConceptKey))
+    insert(db, registers.Acceptation(kanjiJpWord, kanjiAlphabetConceptKey))
+    insert(db, registers.Acceptation(kanaJpWord, kanaAlphabetConceptKey))
   }
 
   override def onCreate(db: SQLiteDatabase): Unit = {
@@ -401,7 +401,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
           insert(db, registers.WordRepresentation(jaWord, kanaKey, ids.next))
 
           val concept = insert(db, registers.Concept(cursor.getString(0))).get
-          insert(db, registers.WordConcept(jaWord, concept))
+          insert(db, registers.Acceptation(jaWord, concept))
 
           for (meaning <- meanings) {
             val reprOpt = representations.get(meaning)
@@ -416,7 +416,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
               reprOpt.get.word
             }
 
-            insert(db, registers.WordConcept(esWord, concept))
+            insert(db, registers.Acceptation(esWord, concept))
           }
         } while(cursor.moveToNext())
       }
@@ -1109,7 +1109,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
   override def isConceptDuplicated(alphabet: Key): Boolean = {
 
-    val conceptTable = sword.langbook.db.registers.WordConcept
+    val conceptTable = sword.langbook.db.registers.Acceptation
     val reprTable = sword.langbook.db.registers.WordRepresentation
     val joinFieldDef = sword.langbook.db.registers.WordReferenceFieldDefinition
 

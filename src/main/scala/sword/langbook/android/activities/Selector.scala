@@ -147,7 +147,7 @@ class Selector extends BaseActivity with AdapterView.OnItemClickListener with Se
       val wordKey = adapter.getItem(position).key
 
       // Delete the WordConcept relation
-      manager.getMapFor(registers.WordConcept).filter(_._2.fields.collectFirst {
+      manager.getMapFor(registers.Acceptation).filter(_._2.fields.collectFirst {
         case field: ForeignKeyField if field.definition.target == registers.Word && field.key == wordKey =>
           true
       }.isDefined).keys.foreach(manager.delete)
