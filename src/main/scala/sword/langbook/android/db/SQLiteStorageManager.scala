@@ -338,6 +338,23 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     })
   }
 
+  private def insertSymbolArraysAndReturnIds(
+      db: SQLiteDatabase, wordTexts: Seq[String],
+      allSymbols: scala.collection.Map[Register.UnicodeType, Key],
+      texts: scala.collection.mutable.Map[String, Register.CollectionId]): Seq[Register.CollectionId] = {
+
+    val newWordTexts = wordTexts.filterNot(texts.keySet)
+    if (newWordTexts.nonEmpty) {
+      val newSymbolArrays = newWordTexts.map(_.map(c => registers.SymbolPosition(allSymbols(c.toInt))))
+      val newIds = insertCollections(db, newSymbolArrays)
+      for (pair <- newWordTexts zip newIds) {
+        texts += pair
+      }
+    }
+
+    wordTexts.map(texts)
+  }
+
   private def fromDbVersion3(db: SQLiteDatabase): Unit = {
     import sword.langbook.db.registers
 
@@ -379,12 +396,14 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
           representations(str) = repr
         }
 
-        do {
-          val writtenSymbols = cursor.getString(0).map(c => registers.SymbolPosition(allSymbols(c.toInt)))
-          val kanaSymbols = cursor.getString(1).map(c => registers.SymbolPosition(allSymbols(c.toInt)))
+        val texts = scala.collection.mutable.Map[String, Register.CollectionId]()
 
+        do {
+          val writtenText = cursor.getString(0)
+          val kanaText = cursor.getString(1)
           val givenMeaning = cursor.getString(2)
-          val meanings = {
+
+          val meaningTexts = {
             if (givenMeaning.indexOf("(") >= 0 || givenMeaning.indexOf(")") >= 0 || givenMeaning.indexOf("/") >= 0 || givenMeaning.indexOf(",") < 0) {
               Array(givenMeaning)
             }
@@ -393,21 +412,22 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
             }
           }
 
-          val symbolArrays = writtenSymbols :: kanaSymbols :: meanings.map(_.map(c => registers.SymbolPosition(allSymbols(c.toInt)))).toList
-          val ids = insertCollections(db, symbolArrays).iterator
+          // Check if the text is already in the database and reuses it if possible
+          val wordTexts = writtenText :: kanaText :: meaningTexts.toList
+          val idIterator = insertSymbolArraysAndReturnIds(db, wordTexts, allSymbols, texts).iterator
 
           val jaWord = insert(db, registers.Word(japaneseKey)).get
-          insert(db, registers.WordRepresentation(jaWord, kanjiKey, ids.next))
-          insert(db, registers.WordRepresentation(jaWord, kanaKey, ids.next))
+          insert(db, registers.WordRepresentation(jaWord, kanjiKey, idIterator.next))
+          insert(db, registers.WordRepresentation(jaWord, kanaKey, idIterator.next))
 
           val concept = insert(db, registers.Concept(cursor.getString(0))).get
           insert(db, registers.Acceptation(jaWord, concept))
 
-          for (meaning <- meanings) {
+          for (meaning <- meaningTexts) {
             val reprOpt = representations.get(meaning)
             val esWord = if (reprOpt.isEmpty) {
               val word = insert(db, registers.Word(spanishKey)).get
-              val repr = registers.WordRepresentation(word, spanishAlphabetKey, ids.next())
+              val repr = registers.WordRepresentation(word, spanishAlphabetKey, idIterator.next())
               representations(meaning) = repr
               insert(db, repr)
               word
