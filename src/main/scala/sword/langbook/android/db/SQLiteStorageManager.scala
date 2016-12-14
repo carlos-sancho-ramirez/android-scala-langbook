@@ -312,14 +312,6 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   }
 
   private def currentSymbolsInDatabase(db: SQLiteDatabase): Map[Register.UnicodeType, Key] = {
-    //val symbolMap = keysFor(db, registers.Symbol).flatMap(k => get(db, k).map((k,_))).toMap
-    //symbolMap.flatMap {
-    //  case (key, reg) =>
-    //    reg.fields.collectFirst {
-    //      case f: UnicodeField => f.value
-    //    }.map((_, key))
-    //}
-
     getMapFor(db, registers.Symbol).map { case (a,b) => (b.unicode, a) }.toMap
   }
 
@@ -353,6 +345,72 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
 
     wordTexts.map(texts)
+  }
+
+  private def insertNewRepresentationForEachAcceptation(db: SQLiteDatabase, jaWord: Key,
+      currentAcceptations: scala.collection.Map[Key, registers.Acceptation], inputConcepts: Iterable[Key], representation: Register.CollectionId): Unit = {
+
+    val acceptations = for (inputConcept <- inputConcepts) yield {
+      currentAcceptations.find(_._2.concept == inputConcept).map(_._1).getOrElse {
+        insert(db, registers.Acceptation(jaWord, inputConcept)).get
+      }
+    }
+
+    for (acceptation <- acceptations) {
+      insert(db, registers.AcceptationRepresentation(acceptation, representation))
+    }
+  }
+
+  private def insertNewKanjiRepresentation(db: SQLiteDatabase, word: Key, kanjiAlphabet: Key, representation: Register.CollectionId): Unit = {
+    insert(db, registers.WordRepresentation(word, kanjiAlphabet, representation))
+  }
+
+  private def moveRepresentationFromWordToItsAcceptations(db: SQLiteDatabase, jaWord: Key, kanjiAlphabet: Key, acceptations: Iterable[Key]): Unit = {
+    val wordRepresentations = getMapFor(db, registers.WordRepresentation, WordReferenceField(jaWord))
+        .filter(_._2.alphabet == kanjiAlphabet)
+    for {
+      representation <- wordRepresentations.values.map(_.symbolArray)
+      acceptation <- acceptations
+    } {
+      insert(db, registers.AcceptationRepresentation(acceptation, representation))
+    }
+
+    for (key <- wordRepresentations.keySet) {
+      delete(db, key)
+    }
+  }
+
+  private def insertKanjiRepresentationAndPossibleAcceptations(db: SQLiteDatabase, jaWord: Key,
+      inputConcepts: Set[Key], kanjiAlphabet: Key, representation: Register.CollectionId): Unit = {
+
+    val jaWordAcceptations = getMapFor(db, registers.Acceptation, WordReferenceField(jaWord))
+    val jaWordAcceptationConcepts = jaWordAcceptations.mapValues(_.concept)
+    val jaWordConcepts = jaWordAcceptationConcepts.values.toSet
+
+    val sameConcepts = jaWordConcepts == inputConcepts
+    def jaWordConceptsContainedInInput = jaWordConcepts.forall(inputConcepts)
+    def inputConceptsContainedInJaWord = inputConcepts.forall(jaWordConcepts)
+
+    if (sameConcepts) {
+      insertNewKanjiRepresentation(db, jaWord, kanjiAlphabet, representation)
+    }
+    else if (inputConceptsContainedInJaWord) {
+      insertNewRepresentationForEachAcceptation(db, jaWord, jaWordAcceptations, inputConcepts, representation)
+    }
+    else {
+      moveRepresentationFromWordToItsAcceptations(db, jaWord, kanjiAlphabet, jaWordAcceptationConcepts.keySet)
+
+      if (jaWordConceptsContainedInInput) {
+        insertNewKanjiRepresentation(db, jaWord, kanjiAlphabet, representation)
+
+        for (inputConcept <- inputConcepts) {
+          insert(db, registers.Acceptation(jaWord, inputConcept))
+        }
+      }
+      else { // Both sets contains elements that are not contained in the other
+        insertNewRepresentationForEachAcceptation(db, jaWord, jaWordAcceptations, inputConcepts, representation)
+      }
+    }
   }
 
   private def fromDbVersion3(db: SQLiteDatabase): Unit = {
@@ -396,75 +454,86 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
           representations(str) = repr
         }
 
+        // TODO: These maps should be prefilled with the existing words in the database
         val texts = scala.collection.mutable.Map[String, Register.CollectionId]()
+        val spanishWords = scala.collection.mutable.Map[String, Register.Index]()
 
         do {
           val writtenText = cursor.getString(0)
           val kanaText = cursor.getString(1)
           val givenMeaning = cursor.getString(2)
 
-          val meaningTexts = {
-            if (givenMeaning.indexOf("(") >= 0 || givenMeaning.indexOf(")") >= 0 || givenMeaning.indexOf("/") >= 0 || givenMeaning.indexOf(",") < 0) {
-              Array(givenMeaning)
+          // From Db version 3 it is possible to find in the meaning field semicolon ';' characters.
+          // semicolons are used here to separate different acceptations for the same word.
+          // Within each acceptation, it is possible to find commas ',' to separate synonyms as well.
+          val meaningTexts: Array[Array[String]] = {
+            val acceptationTexts = {
+              if (givenMeaning.indexOf(";") >= 0) {
+                givenMeaning.split(";").map(_.trim).filter(s => s != null && s.length() > 0)
+              }
+              else {
+                Array(givenMeaning)
+              }
             }
-            else {
-              givenMeaning.split(",").map(_.trim)
+
+            for (acceptationText <- acceptationTexts) yield {
+              if (acceptationText.indexOf("(") >= 0 || acceptationText.indexOf(")") >= 0 || acceptationText.indexOf("/") >= 0 || acceptationText.indexOf(",") < 0) {
+                Array(acceptationText)
+              }
+              else {
+                acceptationText.split(",").map(_.trim)
+              }
             }
           }
 
-          // Check if the text is already in the database and reuses it if possible
-          val wordTexts = writtenText :: kanaText :: meaningTexts.toList
-          val ids = insertSymbolArraysAndReturnIds(db, wordTexts, allSymbols, texts)
-          val idIterator = ids.iterator
+          // Before creating a new word, the kana has to be checked. If there is another word
+          // with the same kana, we will assume that they are the same word, then no new word is
+          // required, but the other one has to be reused.
+          val jaWordOption = texts.get(kanaText).flatMap { kanaCollId =>
+            val values = getMapFor(db, WordRepresentation, SymbolArrayReferenceField(kanaCollId))
+                .filter(_._2.alphabet == kanaKey).map(_._2.word)
+            if (values.size >= 2) throw new AssertionError("Found more than one word with the same kana")
+            values.headOption
+          }
 
-          val jaWord = insert(db, registers.Word(japaneseKey)).get
-          insert(db, registers.WordRepresentation(jaWord, kanjiKey, idIterator.next))
-          insert(db, registers.WordRepresentation(jaWord, kanaKey, idIterator.next))
+          // Check if the text is already in the database and reuses it if possible
+          val wordTexts = writtenText :: kanaText :: meaningTexts.toList.flatten
+          val ids = insertSymbolArraysAndReturnIds(db, wordTexts, allSymbols, texts)
+
+          val jaWord = jaWordOption.getOrElse {
+            val wordKey = insert(db, registers.Word(japaneseKey)).get
+            insert(db, registers.WordRepresentation(wordKey, kanaKey, ids(1)))
+            wordKey
+          }
+
+          // Add all missing Spanish words
+          for (text <- meaningTexts.toList.flatten) {
+            if (!spanishWords.contains(text)) {
+              val key = insert(db, registers.Word(spanishKey)).get
+              spanishWords(text) = key.index
+              insert(db, registers.WordRepresentation(key, spanishAlphabetKey, texts(text)))
+            }
+          }
 
           // Check if there is another word that includes the same meanings and that
           // has only a concept assigned to it. If so, it is understood that both words
           // are synonym and the same concept should be reused. If not, a new concept should be
           // created
-          val wordsWithMeanings = ids.drop(2).map(id => getMapFor(db, registers.WordRepresentation, SymbolArrayReferenceField(id)).values.map(_.word.index).toSet)
-          val wordsWithMeaning = wordsWithMeanings.reduce(_.intersect(_))
-          val spanishTextsLength = meaningTexts.length
-          val wordsMatchingMeanings = wordsWithMeaning.filter { wordIndex =>
-            val wordKey = obtainKey(registers.Word, 0, wordIndex)
-            getMapFor(db, registers.WordRepresentation, WordReferenceField(wordKey)).size == spanishTextsLength
-          }
-
-          var proposedConcept: Key = null
-          wordsMatchingMeanings.exists { wordIndex =>
-            val wordKey = obtainKey(registers.Word, 0, wordIndex)
-            val acceptations = getMapFor(db, registers.Acceptation, WordReferenceField(wordKey)).values
-            if (acceptations.size == 1) {
-              proposedConcept = acceptations.head.concept
-              true
+          val concepts = for (acceptationTexts <- meaningTexts) yield {
+            val wordKeys = acceptationTexts.map(text => obtainKey(registers.Word, 0, spanishWords(text)))
+            val commonConcepts = wordKeys.map { key =>
+              getMapFor(db, registers.Acceptation, WordReferenceField(key)).values.map(_.concept).toSet }.reduce(_.intersect(_))
+            val conceptOption = commonConcepts.find(concept => getMapFor(db, registers.Acceptation, ConceptReferenceField(concept)).size == wordKeys.length)
+            conceptOption.getOrElse {
+              val concept = insert(db, registers.Concept(acceptationTexts.mkString(", "))).get
+              for (wordKey <- wordKeys) {
+                insert(db, registers.Acceptation(wordKey, concept))
+              }
+              concept
             }
-            else false
           }
 
-          val concept = {
-            if (proposedConcept != null) proposedConcept
-            else insert(db, registers.Concept(writtenText)).get
-          }
-          insert(db, registers.Acceptation(jaWord, concept))
-
-          for (meaning <- meaningTexts) {
-            val reprOpt = representations.get(meaning)
-            val esWord = if (reprOpt.isEmpty) {
-              val word = insert(db, registers.Word(spanishKey)).get
-              val repr = registers.WordRepresentation(word, spanishAlphabetKey, idIterator.next())
-              representations(meaning) = repr
-              insert(db, repr)
-              word
-            }
-            else {
-              reprOpt.get.word
-            }
-
-            insert(db, registers.Acceptation(esWord, concept))
-          }
+          insertKanjiRepresentationAndPossibleAcceptations(db, jaWord, concepts.toSet, kanjiKey, ids.head)
         } while(cursor.moveToNext())
       }
     } finally {
