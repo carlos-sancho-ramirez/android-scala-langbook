@@ -178,12 +178,14 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val kanaJpText = "仮名"
     val kanaKanaText = "かな"
 
+    val uKanaText = "う"
+
     val string =
         enLanguageText + spLanguageText + kanjiLanguageText + kanaLanguageText +
         englishEnText + englishSpText + englishJpText + englishKanaText +
         spanishEnText + spanishSpText + spanishJpText + spanishKanaText +
         japaneseEnText + japaneseSpText + japaneseJpText + japaneseKanaText +
-        kanjiJpText + kanjiKanaText + kanaJpText + kanaKanaText
+        kanjiJpText + kanjiKanaText + kanaJpText + kanaKanaText + uKanaText
 
     val symbols = {
       for {
@@ -293,6 +295,19 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     insert(db, registers.Acceptation(spanishJpWord, spAlphabetConceptKey))
     insert(db, registers.Acceptation(kanjiJpWord, kanjiAlphabetConceptKey))
     insert(db, registers.Acceptation(kanaJpWord, kanaAlphabetConceptKey))
+
+    // Just here in case the autoincrement id algorithm starts giving the id 0. As id 0 is used for the whole database.
+    insert(db, registers.Bunch("Unused"))
+
+    // Temporal trial to test Agents
+    val nullBunchKey = obtainKey(registers.Bunch, 0, 0)
+    val uKanaAgentTargetBunch = insert(db, registers.Bunch("Kanji and Kana finishing in う")).get
+    val uKanaSymbolArrayCollection = insert(db, uKanaText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
+    val uKanaCorrelation = insert(db, List(
+        registers.Correlation(kanjiAlphabetKey, uKanaSymbolArrayCollection),
+        registers.Correlation(kanaAlphabetKey, uKanaSymbolArrayCollection))).get
+
+    insert(db, registers.Agent(nullBunchKey, uKanaAgentTargetBunch, uKanaCorrelation, Agent.Flags.justFilter | Agent.Flags.endsWith))
   }
 
   override def onCreate(db: SQLiteDatabase): Unit = {
@@ -664,9 +679,11 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   private def sqlValue(field :Field) :String = {
     field match {
       case f: UnicodeField => f.value.toString
+      case f: IntField => f.value.toString
       case f: LanguageCodeField => s"'${f.code.toString}'"
       case f: CharSequenceField => s"'${f.value}'"
       case f: ForeignKeyField => f.key.index.toString
+      case f: NullableForeignKeyField => f.key.index.toString
       case f: CollectionReferenceField => f.collectionId.toString
       case f => throw new UnsupportedOperationException(s"Undefined field definition $f")
     }
