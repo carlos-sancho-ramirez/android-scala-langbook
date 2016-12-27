@@ -22,6 +22,7 @@ object SQLiteStorageManager {
   // This is required in order that app can know which alphabet is the kana, and which one the Kanji.
   // This should not be required if the app was generic enough.
   // TODO: Remove this hints when the app do not require them
+  val roumajiAlphabetHint = "Roumaji alphabet"
   val kanaAlphabetHint = "Kana alphabet"
   val kanjiAlphabetHint = "Kanji alphabet"
   val englishAlphabetHint = "English alphabet"
@@ -188,9 +189,11 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
         japaneseEnText + japaneseSpText + japaneseJpText + japaneseKanaText +
         kanjiJpText + kanjiKanaText + kanaJpText + kanaKanaText + uKanaText + kuKanaText
 
+    val kana2RoumajiConversionList = sword.langbook.db.Word.hiraganaConversions
+    val conversionCharacters = kana2RoumajiConversionList.map { case (a,b) => a + b }.mkString("")
     val symbols = {
       for {
-        symbol <- string.toSet[Char]
+        symbol <- (conversionCharacters + string).toSet[Char]
         key <- insert(db, registers.Symbol(symbol.toInt))
       } yield (symbol, key)
     }.toMap
@@ -205,6 +208,8 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val kanjiAlphabetKey = insert(db, registers.Alphabet(kanjiAlphabetConceptKey)).get
     val kanaAlphabetConceptKey = insertConcept(SQLiteStorageManager.kanaAlphabetHint).get
     val kanaAlphabetKey = insert(db, registers.Alphabet(kanaAlphabetConceptKey)).get
+    val roumajiAlphabetConceptKey = insertConcept(SQLiteStorageManager.roumajiAlphabetHint).get
+    val roumajiAlphabetKey = insert(db, registers.Alphabet(roumajiAlphabetConceptKey)).get
 
     val englishConceptKey = insertConcept("English").get
     val spanishConceptKey = insertConcept("Spanish").get
@@ -296,6 +301,18 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     insert(db, registers.Acceptation(spanishJpWord, spAlphabetConceptKey))
     insert(db, registers.Acceptation(kanjiJpWord, kanjiAlphabetConceptKey))
     insert(db, registers.Acceptation(kanaJpWord, kanaAlphabetConceptKey))
+
+    // Conversions
+    val kana2RoumajiPositions = {
+      for ((sourceText, targetText) <- kana2RoumajiConversionList) yield {
+        val sourceSymbolArray = insert(db, sourceText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
+        val targetSymbolArray = insert(db, targetText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
+        val pair = insert(db, registers.ConversionPair(sourceSymbolArray, targetSymbolArray)).get
+        registers.ConversionPosition(pair)
+      }
+    }
+    val kana2RoumajiConversionArray = insert(db, kana2RoumajiPositions).get
+    insert(db, registers.Conversion(kanaAlphabetKey, roumajiAlphabetKey, kana2RoumajiConversionArray))
 
     // Just here in case the autoincrement id algorithm starts giving the id 0. As id 0 is used for the whole database.
     insert(db, registers.Bunch("Unused"))
