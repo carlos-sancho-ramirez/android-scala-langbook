@@ -179,13 +179,14 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val kanaKanaText = "かな"
 
     val uKanaText = "う"
+    val kuKanaText = "く"
 
     val string =
         enLanguageText + spLanguageText + kanjiLanguageText + kanaLanguageText +
         englishEnText + englishSpText + englishJpText + englishKanaText +
         spanishEnText + spanishSpText + spanishJpText + spanishKanaText +
         japaneseEnText + japaneseSpText + japaneseJpText + japaneseKanaText +
-        kanjiJpText + kanjiKanaText + kanaJpText + kanaKanaText + uKanaText
+        kanjiJpText + kanjiKanaText + kanaJpText + kanaKanaText + uKanaText + kuKanaText
 
     val symbols = {
       for {
@@ -301,13 +302,22 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
     // Temporal trial to test Agents
     val nullBunchKey = obtainKey(registers.Bunch, 0, 0)
-    val uKanaAgentTargetBunch = insert(db, registers.Bunch("Kanji and Kana finishing in う")).get
+    val uGodanBunch = insert(db, registers.Bunch("Godan verb finishing in う")).get
+    val kuGodanBunch = insert(db, registers.Bunch("Godan verb finishing in く")).get
+
     val uKanaSymbolArrayCollection = insert(db, uKanaText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
     val uKanaCorrelation = insert(db, List(
         registers.Correlation(kanjiAlphabetKey, uKanaSymbolArrayCollection),
         registers.Correlation(kanaAlphabetKey, uKanaSymbolArrayCollection))).get
 
-    insert(db, registers.Agent(nullBunchKey, uKanaAgentTargetBunch, uKanaCorrelation, Agent.Flags.justFilter | Agent.Flags.endsWith))
+    val kuKanaSymbolArrayCollection = insert(db, kuKanaText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
+    val kuKanaCorrelation = insert(db, List(
+      registers.Correlation(kanjiAlphabetKey, kuKanaSymbolArrayCollection),
+      registers.Correlation(kanaAlphabetKey, kuKanaSymbolArrayCollection))).get
+
+    val filterEndFlags = Agent.Flags.justFilter | Agent.Flags.endsWith
+    insert(db, registers.Agent(nullBunchKey, uGodanBunch, nullBunchKey, uKanaCorrelation, filterEndFlags))
+    insert(db, registers.Agent(nullBunchKey, kuGodanBunch, nullBunchKey, kuKanaCorrelation, filterEndFlags))
   }
 
   override def onCreate(db: SQLiteDatabase): Unit = {
@@ -632,6 +642,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     try {
       fieldDef match {
         case f: ForeignKeyFieldDefinition => Some(obtainKey(f.target, 0, value.toInt))
+        case f: NullableForeignKeyFieldDefinition => Some(obtainKey(f.target, 0, value.toInt))
         case _ => None
       }
     }
