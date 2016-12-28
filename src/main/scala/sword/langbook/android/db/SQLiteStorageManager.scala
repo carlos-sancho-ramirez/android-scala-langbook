@@ -303,15 +303,14 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     insert(db, registers.Acceptation(kanaJpWord, kanaAlphabetConceptKey))
 
     // Conversions
-    val kana2RoumajiPositions = {
+    val kana2RoumajiPairs = {
       for ((sourceText, targetText) <- kana2RoumajiConversionList) yield {
         val sourceSymbolArray = insert(db, sourceText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
         val targetSymbolArray = insert(db, targetText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
-        val pair = insert(db, registers.ConversionPair(sourceSymbolArray, targetSymbolArray)).get
-        registers.ConversionPosition(pair)
+        registers.ConversionPair(sourceSymbolArray, targetSymbolArray)
       }
     }
-    val kana2RoumajiConversionArray = insert(db, kana2RoumajiPositions).get
+    val kana2RoumajiConversionArray = insert(db, kana2RoumajiPairs).get
     insert(db, registers.Conversion(kanaAlphabetKey, roumajiAlphabetKey, kana2RoumajiConversionArray))
 
     // Just here in case the autoincrement id algorithm starts giving the id 0. As id 0 is used for the whole database.
