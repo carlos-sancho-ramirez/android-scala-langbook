@@ -181,13 +181,21 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
     val uKanaText = "う"
     val kuKanaText = "く"
+    val ruKanaText = "る"
+
+    val aruRoumajiText = "aru"
+    val oruRoumajiText = "oru"
+    val uruRoumajiText = "uru"
+
+    val ttaKanaText = "った"
 
     val string =
         enLanguageText + spLanguageText + kanjiLanguageText + kanaLanguageText +
         englishEnText + englishSpText + englishJpText + englishKanaText +
         spanishEnText + spanishSpText + spanishJpText + spanishKanaText +
         japaneseEnText + japaneseSpText + japaneseJpText + japaneseKanaText +
-        kanjiJpText + kanjiKanaText + kanaJpText + kanaKanaText + uKanaText + kuKanaText
+        kanjiJpText + kanjiKanaText + kanaJpText + kanaKanaText + uKanaText + kuKanaText +
+        ruKanaText + aruRoumajiText + oruRoumajiText + uruRoumajiText + ttaKanaText
 
     val kana2RoumajiConversionList = sword.langbook.db.Word.hiraganaConversions
     val conversionCharacters = kana2RoumajiConversionList.map { case (a,b) => a + b }.mkString("")
@@ -318,9 +326,21 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
     // Temporal trial to test Agents
     val nullBunchKey = obtainKey(registers.Bunch, 0, 0)
-    val uGodanBunch = insert(db, registers.Bunch("Godan verb finishing in う")).get
-    val kuGodanBunch = insert(db, registers.Bunch("Godan verb finishing in く")).get
+    val nullCorrelationId: Register.CollectionId = 0
 
+    val uGodanBunchKey = insert(db, registers.Bunch("Godan verb finishing in う")).get
+    val kuGodanBunchKey = insert(db, registers.Bunch("Godan verb finishing in く")).get
+    val ruVerbsBunchKey = insert(db, registers.Bunch("Verbs ending with る")).get
+    val ichidanBunchKey = insert(db, registers.Bunch("Ichidan verb")).get
+
+    // This is the target for some agents, but should include statically any -eru and -iru godan
+    // verbs as rule exception
+    val ruGodanBunchKey = insert(db, registers.Bunch("Godan verb ending with る")).get
+
+    val preInformalPastBunchKey = insert(db, registers.Bunch("Pre informal past")).get
+    val informalPastBunchKey = insert(db, registers.Bunch("informal past")).get
+
+    // TODO: Centralise all symbol array insertions to avoid duplicated arrays in the database
     val uKanaSymbolArrayCollection = insert(db, uKanaText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
     val uKanaCorrelation = insert(db, List(
         registers.Correlation(kanjiAlphabetKey, uKanaSymbolArrayCollection),
@@ -331,9 +351,48 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
       registers.Correlation(kanjiAlphabetKey, kuKanaSymbolArrayCollection),
       registers.Correlation(kanaAlphabetKey, kuKanaSymbolArrayCollection))).get
 
-    val filterEndFlags = Agent.Flags.justFilter | Agent.Flags.endsWith
-    insert(db, registers.Agent(nullBunchKey, uGodanBunch, nullBunchKey, uKanaCorrelation, filterEndFlags))
-    insert(db, registers.Agent(nullBunchKey, kuGodanBunch, nullBunchKey, kuKanaCorrelation, filterEndFlags))
+    val ruKanaSymbolArrayCollection = insert(db, ruKanaText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
+    val ruKanjiCorrelation = insert(db, List(
+      registers.Correlation(kanjiAlphabetKey, ruKanaSymbolArrayCollection)
+    )).get
+
+    val aruRoumajiSymbolArrayCollection = insert(db, aruRoumajiText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
+    val aruRoumajiCorrelation = insert(db, List(
+      registers.Correlation(roumajiAlphabetKey, aruRoumajiSymbolArrayCollection)
+    )).get
+
+    val oruRoumajiSymbolArrayCollection = insert(db, oruRoumajiText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
+    val oruRoumajiCorrelation = insert(db, List(
+      registers.Correlation(roumajiAlphabetKey, oruRoumajiSymbolArrayCollection)
+    )).get
+
+    val uruRoumajiSymbolArrayCollection = insert(db, uruRoumajiText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
+    val uruRoumajiCorrelation = insert(db, List(
+      registers.Correlation(roumajiAlphabetKey, uruRoumajiSymbolArrayCollection)
+    )).get
+
+    val ttaKanaSymbolArrayCollection = insert(db, ttaKanaText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
+    val ttaKanaCorrelation = insert(db, List(
+      registers.Correlation(kanjiAlphabetKey, ttaKanaSymbolArrayCollection),
+      registers.Correlation(kanaAlphabetKey, ttaKanaSymbolArrayCollection)
+    )).get
+
+    val matchEndFlags = Agent.Flags.matchEnd
+    insert(db, registers.Agent(nullBunchKey, uGodanBunchKey, nullBunchKey, uKanaCorrelation, matchEndFlags))
+    insert(db, registers.Agent(nullBunchKey, kuGodanBunchKey, nullBunchKey, kuKanaCorrelation, matchEndFlags))
+
+    insert(db, registers.Agent(nullBunchKey, ruVerbsBunchKey, nullBunchKey, ruKanjiCorrelation, matchEndFlags))
+    insert(db, registers.Agent(ruVerbsBunchKey, ruGodanBunchKey, nullBunchKey, aruRoumajiCorrelation, matchEndFlags))
+    insert(db, registers.Agent(ruVerbsBunchKey, ruGodanBunchKey, nullBunchKey, oruRoumajiCorrelation, matchEndFlags))
+    insert(db, registers.Agent(ruVerbsBunchKey, ruGodanBunchKey, nullBunchKey, uruRoumajiCorrelation, matchEndFlags))
+    insert(db, registers.Agent(ruVerbsBunchKey, ichidanBunchKey, ruGodanBunchKey, nullCorrelationId, matchEndFlags))
+
+    val removeEndFlags = Agent.Flags.removeEnd
+    insert(db, registers.Agent(uGodanBunchKey, preInformalPastBunchKey, nullBunchKey, uKanaCorrelation, removeEndFlags))
+    insert(db, registers.Agent(ruGodanBunchKey, preInformalPastBunchKey, nullBunchKey, uKanaCorrelation, removeEndFlags))
+
+    val appendFlags = Agent.Flags.append
+    insert(db, registers.Agent(preInformalPastBunchKey, informalPastBunchKey, nullBunchKey, ttaKanaCorrelation, appendFlags))
   }
 
   override def onCreate(db: SQLiteDatabase): Unit = {
@@ -712,6 +771,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
       case f: ForeignKeyField => f.key.index.toString
       case f: NullableForeignKeyField => f.key.index.toString
       case f: CollectionReferenceField => f.collectionId.toString
+      case f: NullableCollectionReferenceField => f.collectionId.toString
       case f => throw new UnsupportedOperationException(s"Undefined field definition $f")
     }
   }
