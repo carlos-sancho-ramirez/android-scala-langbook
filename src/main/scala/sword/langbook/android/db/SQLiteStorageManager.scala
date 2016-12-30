@@ -8,6 +8,7 @@ import sword.db.Register.CollectionId
 import sword.db.StorageManager.LanguageCodes
 import sword.db._
 import sword.langbook.android.VersionUtils
+import sword.langbook.db.redundant
 import sword.langbook.db.registers
 import sword.langbook.db.registers._
 
@@ -232,26 +233,50 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val spanishKey = insert(db, registers.Language(spanishConceptKey, LanguageCodes.spanish, spAlphabetKey)).get
     val japaneseKey = insert(db, registers.Language(japaneseConceptKey, LanguageCodes.japanese, kanjiAlphabetKey)).get
 
-    val languageEnSymbolArrayCollection = insert(db, enLanguageText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
-    val languageSpSymbolArrayCollection = insert(db, spLanguageText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
-    val languageKanjiSymbolArrayCollection = insert(db, kanjiLanguageText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
-    val languageKanaSymbolArrayCollection = insert(db, kanaLanguageText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
-    val englishEnSymbolArrayCollection = insert(db, englishEnText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
-    val englishSpSymbolArrayCollection = insert(db, englishSpText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
-    val englishJpSymbolArrayCollection = insert(db, englishJpText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
-    val englishKanaSymbolArrayCollection = insert(db, englishKanaText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
-    val spanishEnSymbolArrayCollection = insert(db, spanishEnText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
-    val spanishSpSymbolArrayCollection = insert(db, spanishSpText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
-    val spanishJpSymbolArrayCollection = insert(db, spanishJpText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
-    val spanishKanaSymbolArrayCollection = insert(db, spanishKanaText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
-    val japaneseEnSymbolArrayCollection = insert(db, japaneseEnText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
-    val japaneseSpSymbolArrayCollection = insert(db, japaneseSpText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
-    val japaneseJpSymbolArrayCollection = insert(db, japaneseJpText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
-    val japaneseKanaSymbolArrayCollection = insert(db, japaneseKanaText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
-    val kanjiJpSymbolArrayCollection = insert(db, kanjiJpText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
-    val kanjiKanaSymbolArrayCollection = insert(db, kanjiKanaText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
-    val kanaJpSymbolArrayCollection = insert(db, kanaJpText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
-    val kanaKanaSymbolArrayCollection = insert(db, kanaKanaText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
+    val texts = scala.collection.mutable.Map[String, Register.CollectionId]()
+    val wordTexts = List(
+      enLanguageText,
+      spLanguageText,
+      kanjiLanguageText,
+      kanaLanguageText,
+      englishEnText,
+      englishSpText,
+      englishJpText,
+      englishKanaText,
+      spanishEnText,
+      spanishSpText,
+      spanishJpText,
+      spanishKanaText,
+      japaneseEnText,
+      japaneseSpText,
+      japaneseJpText,
+      japaneseKanaText,
+      kanjiJpText,
+      kanjiKanaText,
+      kanaJpText,
+      kanaKanaText
+    )
+    val arrayIds = insertSymbolArrays(db, wordTexts, symbols, texts).iterator
+    val languageEnSymbolArrayCollection = arrayIds.next
+    val languageSpSymbolArrayCollection = arrayIds.next
+    val languageKanjiSymbolArrayCollection = arrayIds.next
+    val languageKanaSymbolArrayCollection = arrayIds.next
+    val englishEnSymbolArrayCollection = arrayIds.next
+    val englishSpSymbolArrayCollection = arrayIds.next
+    val englishJpSymbolArrayCollection = arrayIds.next
+    val englishKanaSymbolArrayCollection = arrayIds.next
+    val spanishEnSymbolArrayCollection = arrayIds.next
+    val spanishSpSymbolArrayCollection = arrayIds.next
+    val spanishJpSymbolArrayCollection = arrayIds.next
+    val spanishKanaSymbolArrayCollection = arrayIds.next
+    val japaneseEnSymbolArrayCollection = arrayIds.next
+    val japaneseSpSymbolArrayCollection = arrayIds.next
+    val japaneseJpSymbolArrayCollection = arrayIds.next
+    val japaneseKanaSymbolArrayCollection = arrayIds.next
+    val kanjiJpSymbolArrayCollection = arrayIds.next
+    val kanjiKanaSymbolArrayCollection = arrayIds.next
+    val kanaJpSymbolArrayCollection = arrayIds.next
+    val kanaKanaSymbolArrayCollection = arrayIds.next
 
     val languageEnWord = insert(db, registers.Word(englishKey)).get
     val languageSpWord = insert(db, registers.Word(spanishKey)).get
@@ -313,8 +338,9 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     // Conversions
     val kana2RoumajiPairs = {
       for ((sourceText, targetText) <- kana2RoumajiConversionList) yield {
-        val sourceSymbolArray = insert(db, sourceText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
-        val targetSymbolArray = insert(db, targetText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
+        val arrayIds = insertSymbolArrays(db, List(sourceText, targetText), symbols, texts).iterator
+        val sourceSymbolArray = arrayIds.next()
+        val targetSymbolArray = arrayIds.next()
         registers.ConversionPair(sourceSymbolArray, targetSymbolArray)
       }
     }
@@ -340,38 +366,43 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val preInformalPastBunchKey = insert(db, registers.Bunch("Pre informal past")).get
     val informalPastBunchKey = insert(db, registers.Bunch("informal past")).get
 
-    // TODO: Centralise all symbol array insertions to avoid duplicated arrays in the database
-    val uKanaSymbolArrayCollection = insert(db, uKanaText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
+    val correlationTexts = List(
+      uKanaText, kuKanaText, ruKanaText,
+      aruRoumajiText, oruRoumajiText, uruRoumajiText,
+      ttaKanaText
+    )
+    val arrayCorrelationIds = insertSymbolArrays(db, correlationTexts, symbols, texts).iterator
+    val uKanaSymbolArrayCollection = arrayCorrelationIds.next()
     val uKanaCorrelation = insert(db, List(
         registers.Correlation(kanjiAlphabetKey, uKanaSymbolArrayCollection),
         registers.Correlation(kanaAlphabetKey, uKanaSymbolArrayCollection))).get
 
-    val kuKanaSymbolArrayCollection = insert(db, kuKanaText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
+    val kuKanaSymbolArrayCollection = arrayCorrelationIds.next()
     val kuKanaCorrelation = insert(db, List(
       registers.Correlation(kanjiAlphabetKey, kuKanaSymbolArrayCollection),
       registers.Correlation(kanaAlphabetKey, kuKanaSymbolArrayCollection))).get
 
-    val ruKanaSymbolArrayCollection = insert(db, ruKanaText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
+    val ruKanaSymbolArrayCollection = arrayCorrelationIds.next()
     val ruKanjiCorrelation = insert(db, List(
       registers.Correlation(kanjiAlphabetKey, ruKanaSymbolArrayCollection)
     )).get
 
-    val aruRoumajiSymbolArrayCollection = insert(db, aruRoumajiText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
+    val aruRoumajiSymbolArrayCollection = arrayCorrelationIds.next()
     val aruRoumajiCorrelation = insert(db, List(
       registers.Correlation(roumajiAlphabetKey, aruRoumajiSymbolArrayCollection)
     )).get
 
-    val oruRoumajiSymbolArrayCollection = insert(db, oruRoumajiText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
+    val oruRoumajiSymbolArrayCollection = arrayCorrelationIds.next()
     val oruRoumajiCorrelation = insert(db, List(
       registers.Correlation(roumajiAlphabetKey, oruRoumajiSymbolArrayCollection)
     )).get
 
-    val uruRoumajiSymbolArrayCollection = insert(db, uruRoumajiText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
+    val uruRoumajiSymbolArrayCollection = arrayCorrelationIds.next()
     val uruRoumajiCorrelation = insert(db, List(
       registers.Correlation(roumajiAlphabetKey, uruRoumajiSymbolArrayCollection)
     )).get
 
-    val ttaKanaSymbolArrayCollection = insert(db, ttaKanaText.toList.map(c => registers.SymbolPosition(symbols(c)))).get
+    val ttaKanaSymbolArrayCollection = arrayCorrelationIds.next()
     val ttaKanaCorrelation = insert(db, List(
       registers.Correlation(kanjiAlphabetKey, ttaKanaSymbolArrayCollection),
       registers.Correlation(kanaAlphabetKey, ttaKanaSymbolArrayCollection)
@@ -440,11 +471,20 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
       val newSymbolArrays = newWordTexts.map(_.map(c => registers.SymbolPosition(allSymbols(c.toInt))))
       val newIds = insertCollections(db, newSymbolArrays)
       for (pair <- newWordTexts zip newIds) {
+        insert(db, redundant.Text(pair._2, pair._1))
         texts += pair
       }
     }
 
     wordTexts.map(texts)
+  }
+
+  private def insertSymbolArrays(
+      db: SQLiteDatabase, wordTexts: Seq[String],
+      allSymbols: scala.collection.Map[Char, Key],
+      texts: scala.collection.mutable.Map[String, Register.CollectionId]): Seq[Register.CollectionId] = {
+    val symbols = allSymbols.map { case (key, value) => (key.toInt, value)}
+    insertSymbolArraysAndReturnIds(db, wordTexts, symbols, texts)
   }
 
   private def insertNewRepresentationForEachAcceptation(db: SQLiteDatabase, jaWord: Key,
@@ -549,13 +589,16 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
         val representations = scala.collection.mutable.Map[String, registers.WordRepresentation]()
         for (repr <- getMapFor(db, registers.WordRepresentation, AlphabetReferenceField(spanishAlphabetKey)).values) {
-          val str = getStringArray(db,
-            registers.SymbolPosition, repr.symbolArray, registers.SymbolReferenceFieldDefinition)
+          val str = getMapFor(db, redundant.Text, SymbolArrayReferenceField(repr.symbolArray)).values.head.text
           representations(str) = repr
         }
 
-        // TODO: These maps should be prefilled with the existing words in the database
         val texts = scala.collection.mutable.Map[String, Register.CollectionId]()
+        for (textReg <- getMapFor(db, redundant.Text).values) {
+          texts(textReg.text) = textReg.symbolArray
+        }
+
+        // TODO: This map should be prefilled with the existing words in the database
         val spanishWords = scala.collection.mutable.Map[String, Register.Index]()
 
         do {
@@ -1255,64 +1298,22 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     set.toSet
   }
 
-  override def getStringArray[R <: Register](registerDefinition: ArrayableRegisterDefinition[R],
-      id: Register.CollectionId, matcher: ForeignKeyFieldDefinition) :String = {
-    withReadableDatabase(getStringArray(_, registerDefinition, id, matcher))
-  }
-
-  private def getStringArray[R <: Register](
-      db: SQLiteDatabase,
-      registerDefinition: ArrayableRegisterDefinition[R],
-      id: Register.CollectionId,
-      matcher: ForeignKeyFieldDefinition) :String = {
-
-    val params = getArrayParams(registerDefinition)
-
-    val symbolTableName = tableName(matcher.target)
-    val symbolPositionTableName = params.table
-
-    val symbolRefFieldName = fieldName(registerDefinition, matcher)
-
-    val symbolCharFieldDef = sword.db.CharSequenceFieldDefinition
-    val symbolCharFieldName = fieldName(matcher.target, symbolCharFieldDef)
-
-    val query = s"SELECT group_concat($symbolTableName.$symbolCharFieldName,'') FROM $symbolPositionTableName JOIN $symbolTableName ON $symbolTableName.${SQLiteStorageManager.idKey} = $symbolPositionTableName.$symbolRefFieldName WHERE $symbolPositionTableName.${SQLiteStorageManager.collKey} = $id GROUP BY $symbolPositionTableName.${SQLiteStorageManager.collKey} ORDER BY $symbolPositionTableName.${SQLiteStorageManager.idKey} ASC"
-    val cursor = db.rawQuery(query, null)
-
-    if (cursor != null) {
-      try {
-        if (cursor.getCount == 1 && cursor.moveToFirst()) cursor.getString(0)
-        else ""
-      } finally {
-        cursor.close()
-      }
-    }
-    else ""
-  }
-
   override def allStringArray: Map[Key, List[String]] = {
     withReadableDatabase(allStringArray)
   }
 
   private def allStringArray(db: SQLiteDatabase): Map[Key, List[String]] = {
-
-    val registerDefinition = registers.SymbolPosition
-    val params = getArrayParams(registerDefinition)
-    val matcher = registers.SymbolReferenceFieldDefinition
-
-    val reprTable = sword.langbook.db.registers.WordRepresentation
+    val reprTable = registers.WordRepresentation
     val reprTableName = tableName(reprTable)
-    val symbolTableName = tableName(matcher.target)
-    val symbolPositionTableName = params.table
+    val textTable = redundant.Text
+    val textTableName = tableName(textTable)
 
-    val symbolRefFieldName = fieldName(registerDefinition, matcher)
     val wordRefFieldName = fieldName(reprTable, WordReferenceFieldDefinition)
+    val charSequenceFieldName = fieldName(textTable, CharSequenceFieldDefinition)
+    val symbolArrayFieldName = fieldName(textTable, SymbolArrayReferenceFieldDefinition)
     val arrayRefFieldName = fieldName(reprTable, SymbolArrayReferenceFieldDefinition)
 
-    val symbolCharFieldDef = sword.db.CharSequenceFieldDefinition
-    val symbolCharFieldName = fieldName(matcher.target, symbolCharFieldDef)
-
-    val query = s"SELECT $reprTableName.$wordRefFieldName,group_concat($symbolTableName.$symbolCharFieldName,'') FROM $reprTableName JOIN $symbolPositionTableName ON $reprTableName.$arrayRefFieldName = $symbolPositionTableName.${SQLiteStorageManager.collKey} JOIN $symbolTableName ON $symbolTableName.${SQLiteStorageManager.idKey} = $symbolPositionTableName.$symbolRefFieldName GROUP BY $symbolPositionTableName.${SQLiteStorageManager.collKey} ORDER BY $symbolPositionTableName.${SQLiteStorageManager.idKey} ASC"
+    val query = s"SELECT $reprTableName.$wordRefFieldName,$textTableName.$charSequenceFieldName FROM $reprTableName JOIN $textTableName ON $reprTableName.$arrayRefFieldName = $textTableName.$symbolArrayFieldName"
     val cursor = db.rawQuery(query, null)
 
     val result = scala.collection.mutable.Map[Int, List[String]]()
