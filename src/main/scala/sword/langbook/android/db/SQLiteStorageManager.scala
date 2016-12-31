@@ -144,6 +144,112 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
   }
 
+  private def removeAllResolvedBunches(db: SQLiteDatabase): Unit = {
+    val keys = keysFor(db, redundant.ResolvedBunch)
+    for (key <- keys) {
+      delete(db, key)
+    }
+  }
+
+  /**
+   * As some agents targets bunches that are sources of other agents, they must be sorted before
+   * trigger them.
+   */
+  private def sortedAgents(db: SQLiteDatabase): Seq[Agent] = {
+    var agents = getMapFor(db, registers.Agent).values.toSet
+    if (agents.isEmpty) Nil
+    else {
+      val result = ListBuffer[registers.Agent]()
+      var count = Integer.MAX_VALUE
+      while (count > agents.size) {
+        count = agents.size
+
+        val currentAgents = agents
+        val targets = agents.map(_.targetBunch)
+        for (agent <- currentAgents) {
+          if (!targets(agent.sourceBunch) && !targets(agent.sourceBunch)) {
+            agents -= agent
+            result += agent
+          }
+        }
+      }
+
+      result.toList
+    }
+  }
+
+  /**
+   * Fill the resolvedBunch redundant register for the given agent
+   */
+  private def processAgent(db: SQLiteDatabase, agent: registers.Agent, texts: scala.collection.Map[Register.CollectionId, String]): Unit = {
+    val nullBunchKey = obtainKey(registers.Bunch, 0, 0)
+    val sourceWords = {
+      if (agent.sourceBunch == nullBunchKey) {
+        keysFor(db, registers.Word)
+      }
+      else {
+        getMapFor(db, redundant.ResolvedBunch, BunchReferenceField(agent.sourceBunch)).map(_._2.word).toSet
+      }
+    }
+
+    val filteredWords = {
+      if (Agent.Flags.shouldFilterFromSource(agent.flags)) {
+        val result = ListBuffer[Key]()
+
+        // TODO: Another redundant table is required to keep resolved kanji representations
+        // from kana or roumaji from kana
+        val correlation = getCollection(db, registers.Correlation, agent.correlation)
+            .map(e => (e.alphabet, texts(e.symbolArray))).toMap
+
+        for (word <- sourceWords) {
+          // TODO: AcceptationRepresentation should be taken into account as well
+          val wordRepresentations = getMapFor(db, registers.WordRepresentation, WordReferenceField(word)).values
+          val alphabets = wordRepresentations.map(_.alphabet).toSet
+          if (correlation.keySet.forall(alphabets)) {
+            val f = {
+              if (Agent.Flags.startSide(agent.flags)) (a: String, b: String) => a.startsWith(b)
+              else (a: String, b: String) => a.endsWith(b)
+            }
+
+            if (correlation.forall { case (alphabet, correlationText) =>
+              wordRepresentations.filter(_.alphabet == alphabet).exists(repr => f(texts(repr.symbolArray), correlationText))
+            }) {
+              result += word
+            }
+          }
+        }
+
+        result.toSet
+      }
+      else sourceWords
+    }
+
+    val diffWords = {
+      if (agent.diffBunch == nullBunchKey) {
+        Set[Key]()
+      }
+      else {
+        getMapFor(db, redundant.ResolvedBunch, BunchReferenceField(agent.diffBunch)).map(_._2.word).toSet
+      }
+    }
+
+    val resultSet = filteredWords diff diffWords
+
+    // TODO: Add logic to 'add' the correlation if append or prepend flags are active
+
+    for (result <- resultSet) {
+      insert(db, redundant.ResolvedBunch(agent.targetBunch, result))
+    }
+  }
+
+  private def updateResolvedBunches(db: SQLiteDatabase, texts: scala.collection.Map[Register.CollectionId, String]): Unit = {
+    removeAllResolvedBunches(db)
+    val agents = sortedAgents(db)
+    for (agent <- agents) {
+      processAgent(db, agent, texts)
+    }
+  }
+
   def initializeDatabase(db: SQLiteDatabase): Unit = {
     // As a temporal solution, we add some data to the data base
     import sword.langbook.db.registers
@@ -312,7 +418,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     insert(db, registers.WordRepresentation(kanjiJpWord, kanjiAlphabetKey, kanjiJpSymbolArrayCollection))
     insert(db, registers.WordRepresentation(kanjiJpWord, kanaAlphabetKey, kanjiKanaSymbolArrayCollection))
     insert(db, registers.WordRepresentation(kanaJpWord, kanjiAlphabetKey, kanaJpSymbolArrayCollection))
-    insert(db, registers.WordRepresentation(kanaJpWord, kanaAlphabetKey, kanjiKanaSymbolArrayCollection))
+    insert(db, registers.WordRepresentation(kanaJpWord, kanaAlphabetKey, kanaKanaSymbolArrayCollection))
 
     insert(db, registers.Acceptation(languageEnWord, languageConceptKey))
     insert(db, registers.Acceptation(languageSpWord, languageConceptKey))
@@ -424,6 +530,8 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
     val appendFlags = Agent.Flags.append
     insert(db, registers.Agent(preInformalPastBunchKey, informalPastBunchKey, nullBunchKey, ttaKanaCorrelation, appendFlags))
+
+    updateResolvedBunches(db, texts.map(_.swap))
   }
 
   override def onCreate(db: SQLiteDatabase): Unit = {
@@ -635,7 +743,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
           val jaWordOption = texts.get(kanaText).flatMap { kanaCollId =>
             val values = getMapFor(db, WordRepresentation, SymbolArrayReferenceField(kanaCollId))
                 .filter(_._2.alphabet == kanaKey).map(_._2.word)
-            if (values.size >= 2) throw new AssertionError("Found more than one word with the same kana")
+            if (values.size >= 2) throw new AssertionError(s"Found more than one word with the same kana '$kanaText'")
             values.headOption
           }
 
@@ -678,6 +786,8 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
           insertKanjiRepresentationAndPossibleAcceptations(db, jaWord, concepts.toSet, kanjiKey, ids.head)
         } while(cursor.moveToNext())
+
+        updateResolvedBunches(db, texts.map(_.swap))
       }
     } finally {
       cursor.close()
