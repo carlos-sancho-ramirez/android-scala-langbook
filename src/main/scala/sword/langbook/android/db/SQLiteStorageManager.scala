@@ -12,6 +12,7 @@ import sword.langbook.db.redundant
 import sword.langbook.db.registers
 import sword.langbook.db.registers._
 
+import scala.annotation.tailrec
 import scala.collection.mutable.ListBuffer
 
 object SQLiteStorageManager {
@@ -248,6 +249,73 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     for (agent <- agents) {
       processAgent(db, agent, texts)
     }
+  }
+
+  private def removeAllWordTexts(db: SQLiteDatabase): Unit = {
+    val keys = keysFor(db, redundant.WordText)
+    for (key <- keys) {
+      delete(db, key)
+    }
+  }
+
+  private def copySymbolArraysToWordTexts(db: SQLiteDatabase): Unit = {
+    val wordReprs = getMapFor(db, registers.WordRepresentation).values
+    for (wordRepr <- wordReprs) {
+      val texts = getMapFor(db, redundant.Text, NullableSymbolArrayReferenceField(wordRepr.symbolArray))
+      if (texts.size != 1) {
+        throw new AssertionError(s"A single text was expected to be found for symbol array ${wordRepr.symbolArray} but ${texts.size} were found")
+      }
+
+      insert(db, redundant.WordText(wordRepr.word, wordRepr.alphabet, texts.head._1))
+    }
+  }
+
+  private def convertTextIteration(text: String, pairs: Seq[(String, String)], acc: String): Option[String] = {
+    val matching = pairs.find { case (t,_) => text.startsWith(t) }
+    matching.flatMap { case (source, target) =>
+      val newText = text.substring(source.length)
+      val newAcc = acc + target
+      if (newText == "") Some(newAcc)
+      else convertTextIteration(newText, pairs, newAcc)
+    }
+  }
+
+  private def convertText(text: String, pairs: Seq[(String, String)]): Option[String] = {
+    convertTextIteration(text, pairs, "")
+  }
+
+  private def convertAlphabets(db: SQLiteDatabase, texts: scala.collection.Map[Register.CollectionId, String]): Unit = {
+    val nullSymbolArray: Register.CollectionId = 0
+    val conversions = getMapFor(db, registers.Conversion).values
+    for (conversion <- conversions) {
+      // This is ignoring the AcceptationRepresentations assuming that the only conversion registers
+      // are coming from kana, which is not expected to be as AcceptationRepresentation.
+      // TODO: This should also include the AcceptationRepresentations to be generic
+      val sources = getMapFor(db, registers.WordRepresentation, AlphabetReferenceField(conversion.sourceAlphabet)).values
+      val targetedWords = getMapFor(db, registers.WordRepresentation, AlphabetReferenceField(conversion.targetAlphabet)).map(_._2.word).toSet
+
+      val toProcess = sources.filterNot(source => targetedWords(source.word))
+      if (toProcess.nonEmpty) {
+        val pairs = getArray(db, registers.ConversionPair, conversion.conversionArray)
+        val conversionList = pairs.map(pair => texts(pair.sourceSymbolArray) -> texts(pair.targetSymbolArray))
+        for {
+          wordRepr <- toProcess
+          newText <- convertText(texts(wordRepr.symbolArray), conversionList)
+        } {
+          val textReg = redundant.Text(nullSymbolArray, newText)
+          val textKey = find(db, textReg).headOption.getOrElse {
+            insert(db, redundant.Text(nullSymbolArray, newText)).get
+          }
+          insert(db, redundant.WordText(wordRepr.word, conversion.targetAlphabet, textKey))
+        }
+      }
+    }
+  }
+
+  private def updateWordTexts(db: SQLiteDatabase, texts: scala.collection.Map[Register.CollectionId, String]): Unit = {
+    removeAllWordTexts(db)
+    copySymbolArraysToWordTexts(db)
+    convertAlphabets(db, texts)
   }
 
   def initializeDatabase(db: SQLiteDatabase): Unit = {
@@ -531,7 +599,9 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val appendFlags = Agent.Flags.append
     insert(db, registers.Agent(preInformalPastBunchKey, informalPastBunchKey, nullBunchKey, ttaKanaCorrelation, appendFlags))
 
-    updateResolvedBunches(db, texts.map(_.swap))
+    val reversedTexts = texts.map(_.swap)
+    updateWordTexts(db, reversedTexts)
+    updateResolvedBunches(db, reversedTexts)
   }
 
   override def onCreate(db: SQLiteDatabase): Unit = {
@@ -787,7 +857,9 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
           insertKanjiRepresentationAndPossibleAcceptations(db, jaWord, concepts.toSet, kanjiKey, ids.head)
         } while(cursor.moveToNext())
 
-        updateResolvedBunches(db, texts.map(_.swap))
+        val reversedTexts = texts.map(_.swap)
+        updateWordTexts(db, reversedTexts)
+        updateResolvedBunches(db, reversedTexts)
       }
     } finally {
       cursor.close()
