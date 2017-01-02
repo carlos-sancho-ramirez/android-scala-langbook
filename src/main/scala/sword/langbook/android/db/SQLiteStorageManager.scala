@@ -767,7 +767,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
         val representations = scala.collection.mutable.Map[String, registers.WordRepresentation]()
         for (repr <- getMapFor(db, registers.WordRepresentation, AlphabetReferenceField(spanishAlphabetKey)).values) {
-          val str = getMapFor(db, redundant.Text, SymbolArrayReferenceField(repr.symbolArray)).values.head.text
+          val str = getMapFor(db, redundant.Text, NullableSymbolArrayReferenceField(repr.symbolArray)).values.head.text
           representations(str) = repr
         }
 
