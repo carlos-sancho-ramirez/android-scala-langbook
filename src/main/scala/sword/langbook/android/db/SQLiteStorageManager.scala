@@ -182,7 +182,12 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   /**
    * Fill the resolvedBunch redundant register for the given agent
    */
-  private def processAgent(db: SQLiteDatabase, agent: registers.Agent, texts: scala.collection.Map[Register.CollectionId, String]): Unit = {
+  private def processAgent(
+      db: SQLiteDatabase,
+      agent: registers.Agent,
+      arrays: scala.collection.Map[Register.CollectionId, String],
+      texts: scala.collection.Map[Key /* redundant.Text */ , String]): Unit = {
+
     val nullBunchKey = obtainKey(registers.Bunch, 0, 0)
     val sourceWords = {
       if (agent.sourceBunch == nullBunchKey) {
@@ -197,15 +202,13 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
       if (Agent.Flags.shouldFilterFromSource(agent.flags)) {
         val result = ListBuffer[Key]()
 
-        // TODO: Another redundant table is required to keep resolved kanji representations
-        // from kana or roumaji from kana
         val correlation = getCollection(db, registers.Correlation, agent.correlation)
-            .map(e => (e.alphabet, texts(e.symbolArray))).toMap
+            .map(e => (e.alphabet, arrays(e.symbolArray))).toMap
 
         for (word <- sourceWords) {
           // TODO: AcceptationRepresentation should be taken into account as well
-          val wordRepresentations = getMapFor(db, registers.WordRepresentation, WordReferenceField(word)).values
-          val alphabets = wordRepresentations.map(_.alphabet).toSet
+          val wordTexts = getMapFor(db, redundant.WordText, WordReferenceField(word)).values
+          val alphabets = wordTexts.map(_.alphabet).toSet
           if (correlation.keySet.forall(alphabets)) {
             val f = {
               if (Agent.Flags.startSide(agent.flags)) (a: String, b: String) => a.startsWith(b)
@@ -213,7 +216,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
             }
 
             if (correlation.forall { case (alphabet, correlationText) =>
-              wordRepresentations.filter(_.alphabet == alphabet).exists(repr => f(texts(repr.symbolArray), correlationText))
+              wordTexts.filter(_.alphabet == alphabet).exists(repr => f(texts(repr.text), correlationText))
             }) {
               result += word
             }
@@ -243,11 +246,12 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
   }
 
-  private def updateResolvedBunches(db: SQLiteDatabase, texts: scala.collection.Map[Register.CollectionId, String]): Unit = {
+  private def updateResolvedBunches(db: SQLiteDatabase, arrays: scala.collection.Map[Register.CollectionId, String]): Unit = {
     removeAllResolvedBunches(db)
+    val texts = getMapFor(db, redundant.Text).mapValues(_.text)
     val agents = sortedAgents(db)
     for (agent <- agents) {
-      processAgent(db, agent, texts)
+      processAgent(db, agent, arrays, texts)
     }
   }
 
