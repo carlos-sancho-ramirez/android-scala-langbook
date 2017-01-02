@@ -9,6 +9,7 @@ import sword.db.StorageManager.LanguageCodes
 import sword.db._
 import sword.langbook.android.VersionUtils
 import sword.langbook.db.redundant
+import sword.langbook.db.redundant.RedundantWordReferenceField
 import sword.langbook.db.registers
 import sword.langbook.db.registers._
 
@@ -145,6 +146,20 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
   }
 
+  private def removeAllRedundantWords(db: SQLiteDatabase): Unit = {
+    val keys = keysFor(db, redundant.RedundantWord)
+    for (key <- keys) {
+      delete(db, key)
+    }
+  }
+
+  private def copyWordsToRedundantWords(db: SQLiteDatabase): Unit = {
+    val wordKeys = keysFor(db, registers.Word)
+    for (wordKey <- wordKeys) {
+      insert(db, redundant.RedundantWord(wordKey))
+    }
+  }
+
   private def removeAllResolvedBunches(db: SQLiteDatabase): Unit = {
     val keys = keysFor(db, redundant.ResolvedBunch)
     for (key <- keys) {
@@ -179,35 +194,134 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
   }
 
+  private def modifyWord(
+      db: SQLiteDatabase,
+      redundantWordKeys: Set[Key /* RedundantWord */],
+      symbolArrays: scala.collection.Map[Register.CollectionId, String],
+      texts: scala.collection.Map[Key /* Text */, String],
+      correlation: Map[Key /* Alphabet */, String],
+      f: (String, String) => String): Set[Key /* RedundantWord */] = {
+
+    val nullWordKey = obtainKey(registers.Word, 0, 0)
+    val nullSymbolArray: Register.CollectionId = 0
+
+    val result = ListBuffer[Key]()
+    val conversions = getMapFor(db, registers.Conversion).values
+    for (redundantWordKey <- redundantWordKeys) {
+      val wordText = getMapFor(db, redundant.WordText, RedundantWordReferenceField(redundantWordKey))
+      val wordTextMap = wordText.map(pair => (pair._2.alphabet, pair._2.text))
+      if (wordText.size != wordTextMap.size) {
+        throw new AssertionError(s"Unable to modify redundant word with id $redundantWordKey due to a repeated alphabet")
+      }
+
+      val modifiedWordTextMap = scala.collection.mutable.Map[Key /* Alphabet */, String]()
+      for ((alphabet, text) <- correlation) {
+        val originalText = texts(wordTextMap(alphabet))
+        modifiedWordTextMap(alphabet) = f(originalText, text)
+      }
+
+      val missingAlphabets = wordTextMap.keySet diff modifiedWordTextMap.keySet
+      if (missingAlphabets.nonEmpty) {
+        for (alphabet <- missingAlphabets) {
+          val conversionsIterator = conversions.filter(conversion => conversion.targetAlphabet == alphabet && modifiedWordTextMap.contains(conversion.sourceAlphabet)).iterator
+          var convertedText: String = null
+          while (conversionsIterator.hasNext) {
+            val conversion = conversionsIterator.next()
+            val conversionList = retrieveConversionList(db, conversion.conversionArray, symbolArrays)
+            val resultText = convertText(texts(wordTextMap(conversion.sourceAlphabet)), conversionList)
+            if (resultText.isDefined) {
+              convertedText = resultText.get
+            }
+          }
+
+          if (convertedText == null) {
+            throw new AssertionError(s"Unable to apply modification for redundant word with id $redundantWordKey because there is no proper conversion for alphabet $alphabet")
+          }
+
+          modifiedWordTextMap(alphabet) = convertedText
+        }
+      }
+
+      val newWordKey = insert(db, redundant.RedundantWord(nullWordKey)).get
+      for ((alphabet, text) <- modifiedWordTextMap) {
+        val textKey = keysFor(db, redundant.Text, CharSequenceField(text)).headOption.getOrElse {
+          insert(db, redundant.Text(nullSymbolArray, text)).get
+        }
+
+        insert(db, redundant.WordText(newWordKey, alphabet, textKey))
+      }
+
+      result += newWordKey
+    }
+
+    result.toSet
+  }
+
+  private def removeEnd(
+      db: SQLiteDatabase,
+      redundantWordKeys: Set[Key /* RedundantWord */],
+      symbolArrays: scala.collection.Map[Register.CollectionId, String],
+      texts: scala.collection.Map[Key /* Text */, String],
+      correlation: Map[Key /* Alphabet */, String]): Set[Key /* RedundantWord */] = {
+
+    modifyWord(db, redundantWordKeys, symbolArrays, texts, correlation, (originalText, text) => {
+      if (!originalText.endsWith(text)) {
+        throw new AssertionError(s"Unable to remove '$text' at the end of '$originalText'")
+      }
+
+      originalText.substring(0, originalText.length - text.length)
+    })
+  }
+
+  private def append(
+      db: SQLiteDatabase,
+      redundantWordKeys: Set[Key /* RedundantWord */],
+      symbolArrays: scala.collection.Map[Register.CollectionId, String],
+      texts: scala.collection.Map[Key /* Text */, String],
+      correlation: Map[Key /* Alphabet */, String]): Set[Key /* RedundantWord */] = {
+
+    modifyWord(db, redundantWordKeys, symbolArrays, texts, correlation, _ + _)
+  }
+
   /**
    * Fill the resolvedBunch redundant register for the given agent
    */
   private def processAgent(
       db: SQLiteDatabase,
       agent: registers.Agent,
-      arrays: scala.collection.Map[Register.CollectionId, String],
-      texts: scala.collection.Map[Key /* redundant.Text */ , String]): Unit = {
+      arrays: scala.collection.Map[Register.CollectionId, String]): Unit = {
 
+    val nullCorrelation: Register.CollectionId = 0
     val nullBunchKey = obtainKey(registers.Bunch, 0, 0)
-    val sourceWords = {
+    val sourceWords: Set[Key /* RedundantWord */] = {
       if (agent.sourceBunch == nullBunchKey) {
-        keysFor(db, registers.Word)
+        keysFor(db, redundant.RedundantWord)
       }
       else {
         getMapFor(db, redundant.ResolvedBunch, BunchReferenceField(agent.sourceBunch)).map(_._2.word).toSet
       }
     }
 
-    val filteredWords = {
+    val correlation = {
+      if (agent.correlation != nullCorrelation) {
+        getCollection(db, registers.Correlation, agent.correlation)
+          .map(e => (e.alphabet, arrays(e.symbolArray))).toMap
+      }
+      else Map[StorageManager.Key, String]()
+    }
+
+    val texts = scala.collection.mutable.Map[Key, String]()
+    for ((key, textReg) <- getMapFor(db, redundant.Text)) {
+      texts(key) = textReg.text
+    }
+
+    val filteredWords: Set[Key /* RedundantWord */] = {
       if (Agent.Flags.shouldFilterFromSource(agent.flags)) {
         val result = ListBuffer[Key]()
 
-        val correlation = getCollection(db, registers.Correlation, agent.correlation)
-            .map(e => (e.alphabet, arrays(e.symbolArray))).toMap
-
         for (word <- sourceWords) {
           // TODO: AcceptationRepresentation should be taken into account as well
-          val wordTexts = getMapFor(db, redundant.WordText, WordReferenceField(word)).values
+          val wordTexts = getMapFor(db, redundant.WordText, RedundantWordReferenceField(word)).values
           val alphabets = wordTexts.map(_.alphabet).toSet
           if (correlation.keySet.forall(alphabets)) {
             val f = {
@@ -228,7 +342,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
       else sourceWords
     }
 
-    val diffWords = {
+    val diffWords: Set[Key /* RedundantWord */] = {
       if (agent.diffBunch == nullBunchKey) {
         Set[Key]()
       }
@@ -240,18 +354,49 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val resultSet = filteredWords diff diffWords
 
     // TODO: Add logic to 'add' the correlation if append or prepend flags are active
+    val modifiedSet = {
+      if (Agent.Flags.shouldModify(agent.flags)) {
+        val f: (String, String) => String = agent.flags match {
+          case Agent.Flags.removeStart =>
+            (originalText, text) => {
+              if (!originalText.startsWith(text)) {
+                throw new AssertionError(s"Unable to remove '$text' at the start of '$originalText'")
+              }
 
-    for (result <- resultSet) {
+              originalText.substring(text.length)
+            }
+
+          case Agent.Flags.removeEnd =>
+            (originalText, text) => {
+              if (!originalText.endsWith(text)) {
+                throw new AssertionError(s"Unable to remove '$text' at the end of '$originalText'")
+              }
+
+              originalText.substring(0, originalText.length - text.length)
+            }
+
+          case Agent.Flags.append => (orig, text) => orig + text
+          case Agent.Flags.prepend => (orig, text) => text + orig
+        }
+
+        modifyWord(db, resultSet, arrays, texts, correlation, f)
+      }
+      else resultSet
+    }
+
+    for (result <- modifiedSet) {
       insert(db, redundant.ResolvedBunch(agent.targetBunch, result))
     }
   }
 
   private def updateResolvedBunches(db: SQLiteDatabase, arrays: scala.collection.Map[Register.CollectionId, String]): Unit = {
+    removeAllRedundantWords(db)
+    copyWordsToRedundantWords(db)
+
     removeAllResolvedBunches(db)
-    val texts = getMapFor(db, redundant.Text).mapValues(_.text)
     val agents = sortedAgents(db)
     for (agent <- agents) {
-      processAgent(db, agent, arrays, texts)
+      processAgent(db, agent, arrays)
     }
   }
 
@@ -288,6 +433,11 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     convertTextIteration(text, pairs, "")
   }
 
+  private def retrieveConversionList(db: SQLiteDatabase, conversionArray: Register.CollectionId, texts: scala.collection.Map[Register.CollectionId, String]): Seq[(String, String)] = {
+    val pairs = getArray(db, registers.ConversionPair, conversionArray)
+    pairs.map(pair => texts(pair.sourceSymbolArray) -> texts(pair.targetSymbolArray))
+  }
+
   private def convertAlphabets(db: SQLiteDatabase, texts: scala.collection.Map[Register.CollectionId, String]): Unit = {
     val nullSymbolArray: Register.CollectionId = 0
     val conversions = getMapFor(db, registers.Conversion).values
@@ -300,8 +450,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
       val toProcess = sources.filterNot(source => targetedWords(source.word))
       if (toProcess.nonEmpty) {
-        val pairs = getArray(db, registers.ConversionPair, conversion.conversionArray)
-        val conversionList = pairs.map(pair => texts(pair.sourceSymbolArray) -> texts(pair.targetSymbolArray))
+        val conversionList = retrieveConversionList(db, conversion.conversionArray, texts)
         for {
           wordRepr <- toProcess
           newText <- convertText(texts(wordRepr.symbolArray), conversionList)
@@ -1157,8 +1306,8 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     keysFor(db, regDef, null: String)
   }
 
-  private def keysFor(db :SQLiteDatabase, regDef :RegisterDefinition[Register], filter: ForeignKeyField) :Set[Key] = {
-    keysFor(db, regDef, s"${fieldName(regDef, filter)}=${filter.key.index}")
+  private def keysFor(db :SQLiteDatabase, regDef :RegisterDefinition[Register], filter: Field) :Set[Key] = {
+    keysFor(db, regDef, s"${fieldName(regDef, filter)}=${sqlValue(filter)}")
   }
 
   private def replace(db: SQLiteDatabase, register: Register, key: Key): Boolean = {
