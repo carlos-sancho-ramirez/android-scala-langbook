@@ -228,7 +228,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
           while (conversionsIterator.hasNext) {
             val conversion = conversionsIterator.next()
             val conversionList = retrieveConversionList(db, conversion.conversionArray, symbolArrays)
-            val resultText = convertText(texts(wordTextMap(conversion.sourceAlphabet)), conversionList)
+            val resultText = convertText(modifiedWordTextMap(conversion.sourceAlphabet), conversionList)
             if (resultText.isDefined) {
               convertedText = resultText.get
             }
@@ -353,7 +353,6 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
     val resultSet = filteredWords diff diffWords
 
-    // TODO: Add logic to 'add' the correlation if append or prepend flags are active
     val modifiedSet = {
       if (Agent.Flags.shouldModify(agent.flags)) {
         val f: (String, String) => String = agent.flags match {
