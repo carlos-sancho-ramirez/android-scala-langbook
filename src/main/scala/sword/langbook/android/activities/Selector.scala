@@ -32,7 +32,6 @@ class Selector extends BaseActivity with AdapterView.OnItemClickListener with Se
   lazy val listView = findView(TR.listView)
 
   class Adapter extends BaseAdapter {
-    val allItems = linkedDb.words.values.toVector
     lazy val foundTexts = linkedDb.storageManager.allStringArray.map { case (x,y) => (Word(x), y)}
     lazy val allTexts = foundTexts.map { case (word, texts) =>
       val newTexts = texts.flatMap(Word.normalisedText)
@@ -40,13 +39,15 @@ class Selector extends BaseActivity with AdapterView.OnItemClickListener with Se
     }
 
     private var _query = ""
-    private var _items: IndexedSeq[Word] = allItems
+    private var _items: IndexedSeq[Word] = evaluateItems(_query)
 
     override def getItemId(position: Int) = position
     override def getCount = _items.size
     override def getItem(position: Int) = _items(position)
 
     override def getView(position: Int, convertView: View, parent: ViewGroup) = {
+      android.util.Log.i(getClass.getSimpleName, "getView called for position " + position)
+
       val view = {
         if (convertView != null) convertView
         else LayoutInflater.from(parent.getContext).inflate(R.layout.selector_entry, parent, false)
@@ -57,19 +58,20 @@ class Selector extends BaseActivity with AdapterView.OnItemClickListener with Se
       view
     }
 
-    private def updateItems(): Unit = {
-      _items = {
-        if (_query.isEmpty) allItems
-        else {
-          val normalisedQuery = _query.toLowerCase(Locale.ENGLISH)
-          allTexts.flatMap {
-            case (word, strings) =>
-              if (strings.exists(_.contains(normalisedQuery))) Some(word)
-              else None
-          }.toVector
-        }
+    private def evaluateItems(query: String): IndexedSeq[Word] = {
+      if (query != null && query.nonEmpty) {
+        val normalisedQuery = query.toLowerCase(Locale.ENGLISH)
+        allTexts.flatMap {
+          case (word, strings) =>
+            if (strings.exists(_.contains(normalisedQuery))) Some(word)
+            else None
+        }.toVector
       }
+      else allTexts.keySet.toVector
+    }
 
+    private def updateItems(): Unit = {
+      _items = evaluateItems(_query)
       notifyDataSetChanged()
     }
 

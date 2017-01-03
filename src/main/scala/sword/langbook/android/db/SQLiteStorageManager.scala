@@ -9,11 +9,10 @@ import sword.db.StorageManager.LanguageCodes
 import sword.db._
 import sword.langbook.android.VersionUtils
 import sword.langbook.db.redundant
-import sword.langbook.db.redundant.RedundantWordReferenceField
+import sword.langbook.db.redundant.{RedundantWordReferenceField, TextReferenceFieldDefinition}
 import sword.langbook.db.registers
 import sword.langbook.db.registers._
 
-import scala.annotation.tailrec
 import scala.collection.mutable.ListBuffer
 
 object SQLiteStorageManager {
@@ -35,9 +34,6 @@ object SQLiteStorageManager {
 class SQLiteStorageManager(context :Context, dbName: String, override val registerDefinitions :Seq[RegisterDefinition[Register]])
     extends SQLiteOpenHelper(context, dbName, null, SQLiteStorageManager.currentDbVersion)
     with StorageManager {
-
-  // Just to measure time taken
-  var _lastQueryMillis: Long = 0
 
   // The following code is copied from AbstractStorageManager, and it should be centralised
   // TODO: Centralise this code
@@ -73,7 +69,6 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   private def logi(message :String) = android.util.Log.i("DB", message)
 
   private def query(db: SQLiteDatabase, tableName: String, columns: Array[String], whereClause: String, orderByClause: String) = {
-
     val logWhere = {
       if (whereClause != null) s" WHERE $whereClause"
       else ""
@@ -85,24 +80,17 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
 
     logi(s"Executing query: SELECT ${columns.mkString(", ")} FROM $tableName$logWhere$logOrder")
-    val startQueryTime = System.currentTimeMillis
-    try {
-      db.query(tableName, columns, whereClause, null, null, null, orderByClause, null)
-    }
-    finally {
-      _lastQueryMillis = System.currentTimeMillis - startQueryTime
-    }
+    db.query(tableName, columns, whereClause, null, null, null, orderByClause, null)
+  }
+
+  private def query(db: SQLiteDatabase, sqlQuery: String): Cursor = {
+    android.util.Log.i("DB", s"Executing query: $sqlQuery")
+    db.rawQuery(sqlQuery, null)
   }
 
   private def exec(db: SQLiteDatabase, query: String): Unit = {
     logi(s"Executing query: $query")
-    val startQueryTime = System.currentTimeMillis
-    try {
-      db.execSQL(query)
-    }
-    finally {
-      _lastQueryMillis = System.currentTimeMillis - startQueryTime
-    }
+    db.execSQL(query)
   }
 
   private def tableName(regDef :RegisterDefinition[Register]) :String = s"R${registerDefinitions.indexOf(regDef)}"
@@ -1056,13 +1044,8 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     mapFor(regDef, query(db, _, _, null, null))
   }
 
-  private def getMapFor[R <: Register](db: SQLiteDatabase, regDef: RegisterDefinition[R], filter: ForeignKeyField): scala.collection.Map[Key, R] = {
-    val whereClause = s"${fieldName(regDef, filter)}=${filter.key.index}"
-    mapFor(regDef, query(db, _, _, whereClause, null))
-  }
-
-  private def getMapFor[R <: Register](db: SQLiteDatabase, regDef: RegisterDefinition[R], filter: CollectionReferenceField): scala.collection.Map[Key, R] = {
-    val whereClause = s"${fieldName(regDef, filter)}=${filter.collectionId}"
+  private def getMapFor[R <: Register](db: SQLiteDatabase, regDef: RegisterDefinition[R], filter: Field): scala.collection.Map[Key, R] = {
+    val whereClause = s"${fieldName(regDef, filter)}=${sqlValue(filter)}"
     mapFor(regDef, query(db, _, _, whereClause, null))
   }
 
@@ -1463,29 +1446,19 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
   private def withReadableDatabase[T](f: SQLiteDatabase => T): T = {
     val db = getReadableDatabase
-    val startingTimeMillis = System.currentTimeMillis
-
     try {
       f(db)
     } finally {
       db.close()
-
-      val timeMillis = System.currentTimeMillis - startingTimeMillis
-      logi(s"Database query took ${_lastQueryMillis}. Whole operation took $timeMillis milliseconds")
     }
   }
 
   private def withWritableDatabase[T](f: SQLiteDatabase => T): T = {
     val db = getWritableDatabase
-    val startingTimeMillis = System.currentTimeMillis
-
     try {
       f(db)
     } finally {
       db.close()
-
-      val timeMillis = System.currentTimeMillis - startingTimeMillis
-      logi(s"Database query took ${_lastQueryMillis}. Whole operation took $timeMillis milliseconds")
     }
   }
 
@@ -1545,7 +1518,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     withReadableDatabase(getKeysForArray(_, registerDefinition, id))
   }
 
-  override def getMapFor[R <: Register](registerDefinition: RegisterDefinition[R], filter: ForeignKeyField): scala.collection.Map[Key, R] = {
+  override def getMapFor[R <: Register](registerDefinition: RegisterDefinition[R], filter: Field): scala.collection.Map[Key, R] = {
     withReadableDatabase(getMapFor(_, registerDefinition, filter))
   }
 
@@ -1575,11 +1548,11 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val wordRefFieldName = fieldName(reprTable, wordRefFieldDef)
     val languageKey = language.key.index
 
-    val query = s"SELECT $reprTableName.$alphabetFieldName FROM $reprTableName JOIN $wordTableName ON $wordTableName.${SQLiteStorageManager.idKey} = $reprTableName.$wordRefFieldName WHERE $wordTableName.$languageFieldName = $languageKey"
+    val sqlQuery = s"SELECT $reprTableName.$alphabetFieldName FROM $reprTableName JOIN $wordTableName ON $wordTableName.${SQLiteStorageManager.idKey} = $reprTableName.$wordRefFieldName WHERE $wordTableName.$languageFieldName = $languageKey"
     val set = scala.collection.mutable.Set[Key]()
 
     withReadableDatabase { db =>
-      val cursor = db.rawQuery(query, null)
+      val cursor = query(db, sqlQuery)
 
       var count = 0
       if (cursor != null) try {
@@ -1610,11 +1583,11 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val filterFieldName = sourceTableName + '.' + fieldName(sourceRegDef, filter.definition)
     val filterKey = filter.key.index
 
-    val query = s"SELECT $allColumns FROM $sourceTableName JOIN $targetTableName ON $sourceJoinFieldName = $targetJoinFieldName WHERE $filterFieldName = $filterKey"
+    val sqlQuery = s"SELECT $allColumns FROM $sourceTableName JOIN $targetTableName ON $sourceJoinFieldName = $targetJoinFieldName WHERE $filterFieldName = $filterKey"
     val set = scala.collection.mutable.Set[R]()
 
     withReadableDatabase { db =>
-      val cursor = db.rawQuery(query, null)
+      val cursor = query(db, sqlQuery)
 
       if (cursor != null) try {
         if (cursor.getCount > 0 && cursor.moveToFirst()) {
@@ -1637,18 +1610,23 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   }
 
   private def allStringArray(db: SQLiteDatabase): Map[Key, List[String]] = {
-    val reprTable = registers.WordRepresentation
-    val reprTableName = tableName(reprTable)
+    val wordTextTable = redundant.WordText
+    val wordTextTableName = tableName(wordTextTable)
     val textTable = redundant.Text
     val textTableName = tableName(textTable)
+    val wordTable = redundant.RedundantWord
+    val wordTableName = tableName(wordTable)
 
-    val wordRefFieldName = fieldName(reprTable, WordReferenceFieldDefinition)
+    val wordRefFieldName = fieldName(wordTable, NullableWordReferenceFieldDefinition)
+    val redundantWordRefFieldName = fieldName(wordTextTable, redundant.RedundantWordReferenceFieldDefinition)
     val charSequenceFieldName = fieldName(textTable, CharSequenceFieldDefinition)
-    val symbolArrayFieldName = fieldName(textTable, SymbolArrayReferenceFieldDefinition)
-    val arrayRefFieldName = fieldName(reprTable, SymbolArrayReferenceFieldDefinition)
+    val textRefFieldName = fieldName(wordTextTable, TextReferenceFieldDefinition)
 
-    val query = s"SELECT $reprTableName.$wordRefFieldName,$textTableName.$charSequenceFieldName FROM $reprTableName JOIN $textTableName ON $reprTableName.$arrayRefFieldName = $textTableName.$symbolArrayFieldName"
-    val cursor = db.rawQuery(query, null)
+    val sqlQuery = s"SELECT $wordTableName.$wordRefFieldName,$textTableName.$charSequenceFieldName FROM $wordTextTableName " +
+      s"JOIN $textTableName ON $wordTextTableName.$textRefFieldName = $textTableName.${SQLiteStorageManager.idKey} " +
+      s"JOIN $wordTableName ON $wordTextTableName.$redundantWordRefFieldName = $wordTableName.${SQLiteStorageManager.idKey} " +
+      s"WHERE $wordTableName.$wordRefFieldName != 0"
+    val cursor = query(db, sqlQuery)
 
     val result = scala.collection.mutable.Map[Int, List[String]]()
     if (cursor != null) try {
