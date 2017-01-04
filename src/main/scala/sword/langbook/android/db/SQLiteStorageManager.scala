@@ -5,13 +5,12 @@ import android.database.Cursor
 import android.database.sqlite.{SQLiteDatabase, SQLiteOpenHelper}
 import android.util.Log
 import sword.db.Register.CollectionId
-import sword.db.StorageManager.LanguageCodes
 import sword.db._
+import sword.db.StorageManager.LanguageCodes
 import sword.langbook.android.VersionUtils
 import sword.langbook.db.redundant
-import sword.langbook.db.redundant.{RedundantWordReferenceField, TextReferenceFieldDefinition}
 import sword.langbook.db.registers
-import sword.langbook.db.registers._
+import sword.langbook.db.registers.Agent
 
 import scala.collection.mutable.ListBuffer
 
@@ -104,8 +103,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
       val idKey = SQLiteStorageManager.idKey
       val fields = regDef.fields.map { fieldDef =>
         val sqlType = fieldDef match {
-          case CharSequenceFieldDefinition => "TEXT"
-          case LanguageCodeFieldDefinition => "TEXT"
+          case _: CharSequenceFieldDefinition => "TEXT"
           case _ => "INTEGER"
         }
 
@@ -196,7 +194,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val result = ListBuffer[Key]()
     val conversions = getMapFor(db, registers.Conversion).values
     for (redundantWordKey <- redundantWordKeys) {
-      val wordText = getMapFor(db, redundant.WordText, RedundantWordReferenceField(redundantWordKey))
+      val wordText = getMapFor(db, redundant.WordText, redundant.WordText.RedundantWordReferenceField(redundantWordKey))
       val wordTextMap = wordText.map(pair => (pair._2.alphabet, pair._2.text))
       if (wordText.size != wordTextMap.size) {
         throw new AssertionError(s"Unable to modify redundant word with id $redundantWordKey due to a repeated alphabet")
@@ -232,7 +230,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
       val newWordKey = insert(db, redundant.RedundantWord(nullWordKey)).get
       for ((alphabet, text) <- modifiedWordTextMap) {
-        val textKey = keysFor(db, redundant.Text, CharSequenceField(text)).headOption.getOrElse {
+        val textKey = keysFor(db, redundant.Text, redundant.Text.CharSequenceField(text)).headOption.getOrElse {
           insert(db, redundant.Text(nullSymbolArray, text)).get
         }
 
@@ -243,32 +241,6 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
 
     result.toSet
-  }
-
-  private def removeEnd(
-      db: SQLiteDatabase,
-      redundantWordKeys: Set[Key /* RedundantWord */],
-      symbolArrays: scala.collection.Map[Register.CollectionId, String],
-      texts: scala.collection.Map[Key /* Text */, String],
-      correlation: Map[Key /* Alphabet */, String]): Set[Key /* RedundantWord */] = {
-
-    modifyWord(db, redundantWordKeys, symbolArrays, texts, correlation, (originalText, text) => {
-      if (!originalText.endsWith(text)) {
-        throw new AssertionError(s"Unable to remove '$text' at the end of '$originalText'")
-      }
-
-      originalText.substring(0, originalText.length - text.length)
-    })
-  }
-
-  private def append(
-      db: SQLiteDatabase,
-      redundantWordKeys: Set[Key /* RedundantWord */],
-      symbolArrays: scala.collection.Map[Register.CollectionId, String],
-      texts: scala.collection.Map[Key /* Text */, String],
-      correlation: Map[Key /* Alphabet */, String]): Set[Key /* RedundantWord */] = {
-
-    modifyWord(db, redundantWordKeys, symbolArrays, texts, correlation, _ + _)
   }
 
   /**
@@ -286,7 +258,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
         keysFor(db, redundant.RedundantWord)
       }
       else {
-        getMapFor(db, redundant.ResolvedBunch, BunchReferenceField(agent.sourceBunch)).map(_._2.word).toSet
+        getMapFor(db, redundant.ResolvedBunch, redundant.ResolvedBunch.BunchReferenceField(agent.sourceBunch)).map(_._2.word).toSet
       }
     }
 
@@ -309,7 +281,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
         for (word <- sourceWords) {
           // TODO: AcceptationRepresentation should be taken into account as well
-          val wordTexts = getMapFor(db, redundant.WordText, RedundantWordReferenceField(word)).values
+          val wordTexts = getMapFor(db, redundant.WordText, redundant.WordText.RedundantWordReferenceField(word)).values
           val alphabets = wordTexts.map(_.alphabet).toSet
           if (correlation.keySet.forall(alphabets)) {
             val f = {
@@ -335,7 +307,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
         Set[Key]()
       }
       else {
-        getMapFor(db, redundant.ResolvedBunch, BunchReferenceField(agent.diffBunch)).map(_._2.word).toSet
+        getMapFor(db, redundant.ResolvedBunch, redundant.ResolvedBunch.BunchReferenceField(agent.diffBunch)).map(_._2.word).toSet
       }
     }
 
@@ -397,7 +369,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   private def copySymbolArraysToWordTexts(db: SQLiteDatabase): Unit = {
     val wordReprs = getMapFor(db, registers.WordRepresentation).values
     for (wordRepr <- wordReprs) {
-      val texts = getMapFor(db, redundant.Text, NullableSymbolArrayReferenceField(wordRepr.symbolArray))
+      val texts = getMapFor(db, redundant.Text, redundant.Text.SymbolArrayReferenceField(wordRepr.symbolArray))
       if (texts.size != 1) {
         throw new AssertionError(s"A single text was expected to be found for symbol array ${wordRepr.symbolArray} but ${texts.size} were found")
       }
@@ -432,8 +404,8 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
       // This is ignoring the AcceptationRepresentations assuming that the only conversion registers
       // are coming from kana, which is not expected to be as AcceptationRepresentation.
       // TODO: This should also include the AcceptationRepresentations to be generic
-      val sources = getMapFor(db, registers.WordRepresentation, AlphabetReferenceField(conversion.sourceAlphabet)).values
-      val targetedWords = getMapFor(db, registers.WordRepresentation, AlphabetReferenceField(conversion.targetAlphabet)).map(_._2.word).toSet
+      val sources = getMapFor(db, registers.WordRepresentation, registers.WordRepresentation.AlphabetReferenceField(conversion.sourceAlphabet)).values
+      val targetedWords = getMapFor(db, registers.WordRepresentation, registers.WordRepresentation.AlphabetReferenceField(conversion.targetAlphabet)).map(_._2.word).toSet
 
       val toProcess = sources.filterNot(source => targetedWords(source.word))
       if (toProcess.nonEmpty) {
@@ -462,12 +434,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     // As a temporal solution, we add some data to the data base
     import sword.langbook.db.registers
 
-    def insertConcept(hint :String) = {
-      insert(db, new Register {
-        override val definition = registers.Concept
-        override val fields = List(CharSequenceField(hint))
-      })
-    }
+    def insertConcept(hint :String) = insert(db, registers.Concept(hint))
 
     // Adding the English language
     // TODO: Find a way to add languages dynamically and not hardcode them on creating the database
@@ -824,7 +791,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   }
 
   private def moveRepresentationFromWordToItsAcceptations(db: SQLiteDatabase, jaWord: Key, kanjiAlphabet: Key, acceptations: Iterable[Key]): Unit = {
-    val wordRepresentations = getMapFor(db, registers.WordRepresentation, WordReferenceField(jaWord))
+    val wordRepresentations = getMapFor(db, registers.WordRepresentation, registers.WordRepresentation.WordReferenceField(jaWord))
         .filter(_._2.alphabet == kanjiAlphabet)
     for {
       representation <- wordRepresentations.values.map(_.symbolArray)
@@ -841,7 +808,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   private def insertKanjiRepresentationAndPossibleAcceptations(db: SQLiteDatabase, jaWord: Key,
       inputConcepts: Set[Key], kanjiAlphabet: Key, representation: Register.CollectionId): Unit = {
 
-    val jaWordAcceptations = getMapFor(db, registers.Acceptation, WordReferenceField(jaWord))
+    val jaWordAcceptations = getMapFor(db, registers.Acceptation, registers.Acceptation.WordReferenceField(jaWord))
     val jaWordAcceptationConcepts = jaWordAcceptations.mapValues(_.concept)
     val jaWordConcepts = jaWordAcceptationConcepts.values.toSet
 
@@ -895,7 +862,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
         Log.i("kana extraction", "japaneseKey is " + japaneseKey.encoded)
         Log.i("kana extraction", "kanjiKey is " + kanjiKey.encoded)
 
-        val jpWords = keysFor(db, registers.Word, LanguageReferenceField(japaneseKey))
+        val jpWords = keysFor(db, registers.Word, registers.Word.LanguageReferenceField(japaneseKey))
         val jpAlphabetKeys = getMapFor(db, registers.WordRepresentation)
             .foldLeft(Set[Key]()) { (set, repr) =>
               if (jpWords(repr._2.word)) set + repr._2.alphabet
@@ -906,8 +873,8 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
         val kanaKey = (jpAlphabetKeys - kanjiKey).head
 
         val representations = scala.collection.mutable.Map[String, registers.WordRepresentation]()
-        for (repr <- getMapFor(db, registers.WordRepresentation, AlphabetReferenceField(spanishAlphabetKey)).values) {
-          val str = getMapFor(db, redundant.Text, NullableSymbolArrayReferenceField(repr.symbolArray)).values.head.text
+        for (repr <- getMapFor(db, registers.WordRepresentation, registers.WordRepresentation.AlphabetReferenceField(spanishAlphabetKey)).values) {
+          val str = getMapFor(db, redundant.Text, redundant.Text.SymbolArrayReferenceField(repr.symbolArray)).values.head.text
           representations(str) = repr
         }
 
@@ -951,7 +918,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
           // with the same kana, we will assume that they are the same word, then no new word is
           // required, but the other one has to be reused.
           val jaWordOption = texts.get(kanaText).flatMap { kanaCollId =>
-            val values = getMapFor(db, WordRepresentation, SymbolArrayReferenceField(kanaCollId))
+            val values = getMapFor(db, registers.WordRepresentation, registers.WordRepresentation.SymbolArrayReferenceField(kanaCollId))
                 .filter(_._2.alphabet == kanaKey).map(_._2.word)
             if (values.size >= 2) throw new AssertionError(s"Found more than one word with the same kana '$kanaText'")
             values.headOption
@@ -983,8 +950,8 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
           val concepts = for (acceptationTexts <- meaningTexts) yield {
             val wordKeys = acceptationTexts.map(text => obtainKey(registers.Word, 0, spanishWords(text)))
             val commonConcepts = wordKeys.map { key =>
-              getMapFor(db, registers.Acceptation, WordReferenceField(key)).values.map(_.concept).toSet }.reduce(_.intersect(_))
-            val conceptOption = commonConcepts.find(concept => getMapFor(db, registers.Acceptation, ConceptReferenceField(concept)).size == wordKeys.length)
+              getMapFor(db, registers.Acceptation, registers.Acceptation.WordReferenceField(key)).values.map(_.concept).toSet }.reduce(_.intersect(_))
+            val conceptOption = commonConcepts.find(concept => getMapFor(db, registers.Acceptation, registers.Acceptation.ConceptReferenceField(concept)).size == wordKeys.length)
             conceptOption.getOrElse {
               val concept = insert(db, registers.Concept(acceptationTexts.mkString(", "))).get
               for (wordKey <- wordKeys) {
@@ -1126,8 +1093,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     field match {
       case f: UnicodeField => f.value.toString
       case f: IntField => f.value.toString
-      case f: LanguageCodeField => s"'${f.code.toString}'"
-      case f: CharSequenceField => s"'${f.value}'"
+      case f: AbstractCharSequenceField => s"'${f.value}'"
       case f: ForeignKeyField => f.key.index.toString
       case f: NullableForeignKeyField => f.key.index.toString
       case f: CollectionReferenceField => f.collectionId.toString
@@ -1534,15 +1500,16 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     withReadableDatabase(getArray(_, registerDefinition, id))
   }
 
-  override def getAlphabetSet(language: ForeignKeyField, wordRefFieldDef: ForeignKeyFieldDefinition): Set[Key] = {
-
+  override def getAlphabetSet(language: ForeignKeyField): Set[Key] = {
     val wordTable = sword.langbook.db.registers.Word
     val reprTable = sword.langbook.db.registers.WordRepresentation
+
+    val wordRefFieldDef = reprTable.WordReferenceField
 
     val wordTableName = tableName(wordTable)
     val reprTableName = tableName(reprTable)
 
-    val alphabetFieldName = fieldName(reprTable, sword.langbook.db.registers.AlphabetReferenceFieldDefinition)
+    val alphabetFieldName = fieldName(reprTable, reprTable.AlphabetReferenceField)
     val languageFieldName = fieldName(wordTable, language.definition)
 
     val wordRefFieldName = fieldName(reprTable, wordRefFieldDef)
@@ -1570,15 +1537,15 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     set.toSet
   }
 
-  override def getJointSet[R <: Register](sourceRegDef: RegisterDefinition[Register], targetRegDef: RegisterDefinition[R], filter: ForeignKeyField, join: ForeignKeyFieldDefinition): Set[R] = {
+  override def getJointSet[R <: Register](sourceRegDef: RegisterDefinition[Register], targetRegDef: RegisterDefinition[R], filter: ForeignKeyField, joinLeft: ForeignKeyFieldDefinition, joinRight: ForeignKeyFieldDefinition): Set[R] = {
 
     val sourceTableName = tableName(sourceRegDef)
     val targetTableName = tableName(targetRegDef)
 
     val allColumns = targetRegDef.fields.map(f => targetTableName + '.' + fieldName(targetRegDef, f)).mkString(", ")
 
-    val sourceJoinFieldName = sourceTableName + '.' + fieldName(sourceRegDef, join)
-    val targetJoinFieldName = targetTableName + '.' + fieldName(targetRegDef, join)
+    val sourceJoinFieldName = sourceTableName + '.' + fieldName(sourceRegDef, joinLeft)
+    val targetJoinFieldName = targetTableName + '.' + fieldName(targetRegDef, joinRight)
 
     val filterFieldName = sourceTableName + '.' + fieldName(sourceRegDef, filter.definition)
     val filterKey = filter.key.index
@@ -1617,10 +1584,10 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val wordTable = redundant.RedundantWord
     val wordTableName = tableName(wordTable)
 
-    val wordRefFieldName = fieldName(wordTable, NullableWordReferenceFieldDefinition)
-    val redundantWordRefFieldName = fieldName(wordTextTable, redundant.RedundantWordReferenceFieldDefinition)
-    val charSequenceFieldName = fieldName(textTable, CharSequenceFieldDefinition)
-    val textRefFieldName = fieldName(wordTextTable, TextReferenceFieldDefinition)
+    val wordRefFieldName = fieldName(wordTable, redundant.RedundantWord.WordReferenceField)
+    val redundantWordRefFieldName = fieldName(wordTextTable, wordTextTable.RedundantWordReferenceField)
+    val charSequenceFieldName = fieldName(textTable, textTable.CharSequenceField)
+    val textRefFieldName = fieldName(wordTextTable, wordTextTable.TextReferenceField)
 
     val sqlQuery = s"SELECT $wordTableName.$wordRefFieldName,$textTableName.$charSequenceFieldName FROM $wordTextTableName " +
       s"JOIN $textTableName ON $wordTextTableName.$textRefFieldName = $textTableName.${SQLiteStorageManager.idKey} " +
@@ -1647,24 +1614,25 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
   override def isConceptDuplicated(alphabet: Key): Boolean = {
 
-    val conceptTable = sword.langbook.db.registers.Acceptation
-    val reprTable = sword.langbook.db.registers.WordRepresentation
-    val joinFieldDef = sword.langbook.db.registers.WordReferenceFieldDefinition
+    val acceptationTable = registers.Acceptation
+    val reprTable = registers.WordRepresentation
 
-    val conceptTableName = tableName(conceptTable)
+    val conceptTableName = tableName(acceptationTable)
     val reprTableName = tableName(reprTable)
 
-    val conceptWordFieldName = fieldName(conceptTable, joinFieldDef)
-    val reprWordFieldName = fieldName(reprTable, joinFieldDef)
+    val conceptWordFieldName = fieldName(acceptationTable, acceptationTable.WordReferenceField)
+    val reprWordFieldName = fieldName(reprTable, reprTable.WordReferenceField)
 
-    val conceptFieldName = fieldName(conceptTable, sword.langbook.db.registers.ConceptReferenceFieldDefinition)
-    val alphabetFieldName = fieldName(reprTable, sword.langbook.db.registers.AlphabetReferenceFieldDefinition)
+    val conceptFieldName = fieldName(acceptationTable, acceptationTable.ConceptReferenceField)
+    val alphabetFieldName = fieldName(reprTable, reprTable.AlphabetReferenceField)
 
     val alphabetKey = alphabet.index
 
     var repeated = false
     withReadableDatabase { db =>
-      val query = s"SELECT $conceptTableName.$conceptFieldName FROM $conceptTableName JOIN $reprTableName ON $conceptTableName.$conceptWordFieldName = $reprTableName.$reprWordFieldName WHERE $reprTableName.$alphabetFieldName = $alphabetKey"
+      val query = s"SELECT $conceptTableName.$conceptFieldName FROM $conceptTableName " +
+        s"JOIN $reprTableName ON $conceptTableName.$conceptWordFieldName = $reprTableName.$reprWordFieldName " +
+        s"WHERE $reprTableName.$alphabetFieldName = $alphabetKey"
       val cursor = db.rawQuery(query, null)
 
       val set = scala.collection.mutable.Set[Register.Index]()
@@ -1699,7 +1667,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val reprTableName = tableName(reprTable)
     val symbolPositionTableName = tableName(symbolPositionTable)
 
-    val arrayRefFieldName = fieldName(reprTable, SymbolArrayReferenceFieldDefinition)
+    val arrayRefFieldName = fieldName(reprTable, reprTable.SymbolArrayReferenceField)
 
     val targetTableName = tableName(targetRegDef)
     val targetFieldName = fieldName(targetRegDef, targetFieldDef)
@@ -1710,7 +1678,9 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val filterId = filter.key.index
     val filterClause = s"$filterTableName.$filterFieldName = $filterId"
 
-    val query = s"SELECT $target FROM $reprTableName JOIN $symbolPositionTableName ON $reprTableName.$arrayRefFieldName = $symbolPositionTableName.${SQLiteStorageManager.collKey} WHERE $filterClause"
+    val query = s"SELECT $target FROM $reprTableName " +
+      s"JOIN $symbolPositionTableName ON $reprTableName.$arrayRefFieldName = $symbolPositionTableName.${SQLiteStorageManager.collKey} " +
+      s"WHERE $filterClause"
     val cursor = db.rawQuery(query, null)
 
     val result = scala.collection.mutable.Set[Int]()
@@ -1733,10 +1703,11 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
   private def alphabetsWhereSymbolIncluded(db: SQLiteDatabase, symbol: Key): Set[Key] = {
     keySetForAlphabetSymbolMatching(db,
-        registers.WordRepresentation,
-        registers.AlphabetReferenceFieldDefinition,
-        registers.SymbolPosition,
-        registers.SymbolReferenceField(symbol))
+      registers.WordRepresentation,
+      registers.WordRepresentation.AlphabetReferenceField,
+      registers.SymbolPosition,
+      registers.SymbolPosition.SymbolReferenceField(symbol)
+    )
   }
 
   override def allSymbolsInAlphabet(alphabet: Key): Set[Key] = {
@@ -1746,8 +1717,9 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   private def allSymbolsInAlphabet(db: SQLiteDatabase, alphabet: Key): Set[Key] = {
     keySetForAlphabetSymbolMatching(db,
       registers.SymbolPosition,
-      registers.SymbolReferenceFieldDefinition,
+      registers.SymbolPosition.SymbolReferenceField,
       registers.WordRepresentation,
-      registers.AlphabetReferenceField(alphabet))
+      registers.WordRepresentation.AlphabetReferenceField(alphabet)
+    )
   }
 }

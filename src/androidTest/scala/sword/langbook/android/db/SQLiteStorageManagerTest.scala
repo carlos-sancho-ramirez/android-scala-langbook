@@ -76,7 +76,7 @@ class SQLiteStorageManagerTest extends InstrumentationTestCase {
 
   val numRegCollRefFieldDef = new CollectionReferenceFieldDefinition {
     override val target = numRegDef
-    override protected def from: (CollectionId) => CollectionReferenceField = ???
+    override def newField: CollectionId => CollectionReferenceField = ???
   }
 
   class NumRegister(value :Int) extends Register {
