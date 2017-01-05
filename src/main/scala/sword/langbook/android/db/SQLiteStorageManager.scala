@@ -142,7 +142,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   private def copyWordsToRedundantWords(db: SQLiteDatabase): Unit = {
     val wordKeys = keysFor(db, registers.Word)
     for (wordKey <- wordKeys) {
-      insertAndAssert(db, redundant.RedundantWord(wordKey))
+      insertAndAssert(db, redundant.RedundantWord(wordKey, wordKey))
     }
   }
 
@@ -188,7 +188,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
       correlation: Map[Key /* Alphabet */, String],
       f: (String, String) => String): Set[Key /* RedundantWord */] = {
 
-    val nullWordKey = obtainKey(registers.Word, 0, 0)
+    val nullWordKey = obtainKey(registers.Word, Register.undefinedCollection, Register.nullIndex)
     val nullSymbolArray: Register.CollectionId = 0
 
     val result = ListBuffer[Key]()
@@ -228,7 +228,8 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
         }
       }
 
-      val newWordKey = insert(db, redundant.RedundantWord(nullWordKey)).get
+      val originalWordKey = get(db, redundantWordKey).get.asInstanceOf[redundant.RedundantWord].originalWord
+      val newWordKey = insert(db, redundant.RedundantWord(nullWordKey, originalWordKey)).get
       for ((alphabet, text) <- modifiedWordTextMap) {
         val textKey = keysFor(db, redundant.Text, redundant.Text.CharSequenceField(text)).headOption.getOrElse {
           insert(db, redundant.Text(nullSymbolArray, text)).get
