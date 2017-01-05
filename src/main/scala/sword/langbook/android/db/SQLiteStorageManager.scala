@@ -142,7 +142,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   private def copyWordsToRedundantWords(db: SQLiteDatabase): Unit = {
     val wordKeys = keysFor(db, registers.Word)
     for (wordKey <- wordKeys) {
-      insert(db, redundant.RedundantWord(wordKey))
+      insertAndAssert(db, redundant.RedundantWord(wordKey))
     }
   }
 
@@ -234,7 +234,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
           insert(db, redundant.Text(nullSymbolArray, text)).get
         }
 
-        insert(db, redundant.WordText(newWordKey, alphabet, textKey))
+        insertAndAssert(db, redundant.WordText(newWordKey, alphabet, textKey))
       }
 
       result += newWordKey
@@ -344,7 +344,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
 
     for (result <- modifiedSet) {
-      insert(db, redundant.ResolvedBunch(agent.targetBunch, result))
+      insertAndAssert(db, redundant.ResolvedBunch(agent.targetBunch, result))
     }
   }
 
@@ -374,7 +374,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
         throw new AssertionError(s"A single text was expected to be found for symbol array ${wordRepr.symbolArray} but ${texts.size} were found")
       }
 
-      insert(db, redundant.WordText(wordRepr.word, wordRepr.alphabet, texts.head._1))
+      insertAndAssert(db, redundant.WordText(wordRepr.word, wordRepr.alphabet, texts.head._1))
     }
   }
 
@@ -418,7 +418,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
           val textKey = find(db, textReg).headOption.getOrElse {
             insert(db, redundant.Text(nullSymbolArray, newText)).get
           }
-          insert(db, redundant.WordText(wordRepr.word, conversion.targetAlphabet, textKey))
+          insertAndAssert(db, redundant.WordText(wordRepr.word, conversion.targetAlphabet, textKey))
         }
       }
     }
@@ -506,9 +506,9 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val japaneseConceptKey = insertConcept("Japanese").get
 
     val languageConceptKey = insertConcept("language").get
-    insert(db, registers.ConceptTypeRelation(englishConceptKey, languageConceptKey))
-    insert(db, registers.ConceptTypeRelation(spanishConceptKey, languageConceptKey))
-    insert(db, registers.ConceptTypeRelation(japaneseConceptKey, languageConceptKey))
+    insertAndAssert(db, registers.ConceptTypeRelation(englishConceptKey, languageConceptKey))
+    insertAndAssert(db, registers.ConceptTypeRelation(spanishConceptKey, languageConceptKey))
+    insertAndAssert(db, registers.ConceptTypeRelation(japaneseConceptKey, languageConceptKey))
 
     val englishKey = insert(db, registers.Language(englishConceptKey, LanguageCodes.english, enAlphabetKey)).get
     val spanishKey = insert(db, registers.Language(spanishConceptKey, LanguageCodes.spanish, spAlphabetKey)).get
@@ -574,47 +574,47 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val kanjiJpWord = insert(db, registers.Word(japaneseKey)).get
     val kanaJpWord = insert(db, registers.Word(japaneseKey)).get
 
-    insert(db, registers.WordRepresentation(languageEnWord, enAlphabetKey, languageEnSymbolArrayCollection))
-    insert(db, registers.WordRepresentation(languageSpWord, spAlphabetKey, languageSpSymbolArrayCollection))
-    insert(db, registers.WordRepresentation(languageJpWord, kanjiAlphabetKey, languageKanjiSymbolArrayCollection))
-    insert(db, registers.WordRepresentation(languageJpWord, kanaAlphabetKey, languageKanaSymbolArrayCollection))
-    insert(db, registers.WordRepresentation(englishEnWord, enAlphabetKey, englishEnSymbolArrayCollection))
-    insert(db, registers.WordRepresentation(englishSpWord, spAlphabetKey, englishSpSymbolArrayCollection))
-    insert(db, registers.WordRepresentation(englishJpWord, kanjiAlphabetKey, englishJpSymbolArrayCollection))
-    insert(db, registers.WordRepresentation(englishJpWord, kanaAlphabetKey, englishKanaSymbolArrayCollection))
-    insert(db, registers.WordRepresentation(spanishEnWord, enAlphabetKey, spanishEnSymbolArrayCollection))
-    insert(db, registers.WordRepresentation(spanishSpWord, spAlphabetKey, spanishSpSymbolArrayCollection))
-    insert(db, registers.WordRepresentation(spanishJpWord, kanjiAlphabetKey, spanishJpSymbolArrayCollection))
-    insert(db, registers.WordRepresentation(spanishJpWord, kanaAlphabetKey, spanishKanaSymbolArrayCollection))
-    insert(db, registers.WordRepresentation(japaneseEnWord, enAlphabetKey, japaneseEnSymbolArrayCollection))
-    insert(db, registers.WordRepresentation(japaneseSpWord, spAlphabetKey, japaneseSpSymbolArrayCollection))
-    insert(db, registers.WordRepresentation(japaneseJpWord, kanjiAlphabetKey, japaneseJpSymbolArrayCollection))
-    insert(db, registers.WordRepresentation(japaneseJpWord, kanaAlphabetKey, japaneseKanaSymbolArrayCollection))
-    insert(db, registers.WordRepresentation(kanjiJpWord, kanjiAlphabetKey, kanjiJpSymbolArrayCollection))
-    insert(db, registers.WordRepresentation(kanjiJpWord, kanaAlphabetKey, kanjiKanaSymbolArrayCollection))
-    insert(db, registers.WordRepresentation(kanaJpWord, kanjiAlphabetKey, kanaJpSymbolArrayCollection))
-    insert(db, registers.WordRepresentation(kanaJpWord, kanaAlphabetKey, kanaKanaSymbolArrayCollection))
+    insertAndAssert(db, registers.WordRepresentation(languageEnWord, enAlphabetKey, languageEnSymbolArrayCollection))
+    insertAndAssert(db, registers.WordRepresentation(languageSpWord, spAlphabetKey, languageSpSymbolArrayCollection))
+    insertAndAssert(db, registers.WordRepresentation(languageJpWord, kanjiAlphabetKey, languageKanjiSymbolArrayCollection))
+    insertAndAssert(db, registers.WordRepresentation(languageJpWord, kanaAlphabetKey, languageKanaSymbolArrayCollection))
+    insertAndAssert(db, registers.WordRepresentation(englishEnWord, enAlphabetKey, englishEnSymbolArrayCollection))
+    insertAndAssert(db, registers.WordRepresentation(englishSpWord, spAlphabetKey, englishSpSymbolArrayCollection))
+    insertAndAssert(db, registers.WordRepresentation(englishJpWord, kanjiAlphabetKey, englishJpSymbolArrayCollection))
+    insertAndAssert(db, registers.WordRepresentation(englishJpWord, kanaAlphabetKey, englishKanaSymbolArrayCollection))
+    insertAndAssert(db, registers.WordRepresentation(spanishEnWord, enAlphabetKey, spanishEnSymbolArrayCollection))
+    insertAndAssert(db, registers.WordRepresentation(spanishSpWord, spAlphabetKey, spanishSpSymbolArrayCollection))
+    insertAndAssert(db, registers.WordRepresentation(spanishJpWord, kanjiAlphabetKey, spanishJpSymbolArrayCollection))
+    insertAndAssert(db, registers.WordRepresentation(spanishJpWord, kanaAlphabetKey, spanishKanaSymbolArrayCollection))
+    insertAndAssert(db, registers.WordRepresentation(japaneseEnWord, enAlphabetKey, japaneseEnSymbolArrayCollection))
+    insertAndAssert(db, registers.WordRepresentation(japaneseSpWord, spAlphabetKey, japaneseSpSymbolArrayCollection))
+    insertAndAssert(db, registers.WordRepresentation(japaneseJpWord, kanjiAlphabetKey, japaneseJpSymbolArrayCollection))
+    insertAndAssert(db, registers.WordRepresentation(japaneseJpWord, kanaAlphabetKey, japaneseKanaSymbolArrayCollection))
+    insertAndAssert(db, registers.WordRepresentation(kanjiJpWord, kanjiAlphabetKey, kanjiJpSymbolArrayCollection))
+    insertAndAssert(db, registers.WordRepresentation(kanjiJpWord, kanaAlphabetKey, kanjiKanaSymbolArrayCollection))
+    insertAndAssert(db, registers.WordRepresentation(kanaJpWord, kanjiAlphabetKey, kanaJpSymbolArrayCollection))
+    insertAndAssert(db, registers.WordRepresentation(kanaJpWord, kanaAlphabetKey, kanaKanaSymbolArrayCollection))
 
-    insert(db, registers.Acceptation(languageEnWord, languageConceptKey))
-    insert(db, registers.Acceptation(languageSpWord, languageConceptKey))
-    insert(db, registers.Acceptation(languageJpWord, languageConceptKey))
-    insert(db, registers.Acceptation(englishEnWord, englishConceptKey))
-    insert(db, registers.Acceptation(englishSpWord, englishConceptKey))
-    insert(db, registers.Acceptation(englishJpWord, englishConceptKey))
-    insert(db, registers.Acceptation(spanishEnWord, spanishConceptKey))
-    insert(db, registers.Acceptation(spanishSpWord, spanishConceptKey))
-    insert(db, registers.Acceptation(spanishJpWord, spanishConceptKey))
-    insert(db, registers.Acceptation(japaneseEnWord, japaneseConceptKey))
-    insert(db, registers.Acceptation(japaneseSpWord, japaneseConceptKey))
-    insert(db, registers.Acceptation(japaneseJpWord, japaneseConceptKey))
-    insert(db, registers.Acceptation(englishEnWord, enAlphabetConceptKey))
-    insert(db, registers.Acceptation(englishSpWord, enAlphabetConceptKey))
-    insert(db, registers.Acceptation(englishJpWord, enAlphabetConceptKey))
-    insert(db, registers.Acceptation(spanishEnWord, spAlphabetConceptKey))
-    insert(db, registers.Acceptation(spanishSpWord, spAlphabetConceptKey))
-    insert(db, registers.Acceptation(spanishJpWord, spAlphabetConceptKey))
-    insert(db, registers.Acceptation(kanjiJpWord, kanjiAlphabetConceptKey))
-    insert(db, registers.Acceptation(kanaJpWord, kanaAlphabetConceptKey))
+    insertAndAssert(db, registers.Acceptation(languageEnWord, languageConceptKey))
+    insertAndAssert(db, registers.Acceptation(languageSpWord, languageConceptKey))
+    insertAndAssert(db, registers.Acceptation(languageJpWord, languageConceptKey))
+    insertAndAssert(db, registers.Acceptation(englishEnWord, englishConceptKey))
+    insertAndAssert(db, registers.Acceptation(englishSpWord, englishConceptKey))
+    insertAndAssert(db, registers.Acceptation(englishJpWord, englishConceptKey))
+    insertAndAssert(db, registers.Acceptation(spanishEnWord, spanishConceptKey))
+    insertAndAssert(db, registers.Acceptation(spanishSpWord, spanishConceptKey))
+    insertAndAssert(db, registers.Acceptation(spanishJpWord, spanishConceptKey))
+    insertAndAssert(db, registers.Acceptation(japaneseEnWord, japaneseConceptKey))
+    insertAndAssert(db, registers.Acceptation(japaneseSpWord, japaneseConceptKey))
+    insertAndAssert(db, registers.Acceptation(japaneseJpWord, japaneseConceptKey))
+    insertAndAssert(db, registers.Acceptation(englishEnWord, enAlphabetConceptKey))
+    insertAndAssert(db, registers.Acceptation(englishSpWord, enAlphabetConceptKey))
+    insertAndAssert(db, registers.Acceptation(englishJpWord, enAlphabetConceptKey))
+    insertAndAssert(db, registers.Acceptation(spanishEnWord, spAlphabetConceptKey))
+    insertAndAssert(db, registers.Acceptation(spanishSpWord, spAlphabetConceptKey))
+    insertAndAssert(db, registers.Acceptation(spanishJpWord, spAlphabetConceptKey))
+    insertAndAssert(db, registers.Acceptation(kanjiJpWord, kanjiAlphabetConceptKey))
+    insertAndAssert(db, registers.Acceptation(kanaJpWord, kanaAlphabetConceptKey))
 
     // Conversions
     val kana2RoumajiPairs = {
@@ -626,10 +626,10 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
       }
     }
     val kana2RoumajiConversionArray = insert(db, kana2RoumajiPairs).get
-    insert(db, registers.Conversion(kanaAlphabetKey, roumajiAlphabetKey, kana2RoumajiConversionArray))
+    insertAndAssert(db, registers.Conversion(kanaAlphabetKey, roumajiAlphabetKey, kana2RoumajiConversionArray))
 
     // Just here in case the autoincrement id algorithm starts giving the id 0. As id 0 is used for the whole database.
-    insert(db, registers.Bunch("Unused"))
+    insertAndAssert(db, registers.Bunch("Unused"))
 
     // Temporal trial to test Agents
     val nullBunchKey = obtainKey(registers.Bunch, 0, 0)
@@ -690,21 +690,21 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     )).get
 
     val matchEndFlags = Agent.Flags.matchEnd
-    insert(db, registers.Agent(nullBunchKey, uGodanBunchKey, nullBunchKey, uKanaCorrelation, matchEndFlags))
-    insert(db, registers.Agent(nullBunchKey, kuGodanBunchKey, nullBunchKey, kuKanaCorrelation, matchEndFlags))
+    insertAndAssert(db, registers.Agent(nullBunchKey, uGodanBunchKey, nullBunchKey, uKanaCorrelation, matchEndFlags))
+    insertAndAssert(db, registers.Agent(nullBunchKey, kuGodanBunchKey, nullBunchKey, kuKanaCorrelation, matchEndFlags))
 
-    insert(db, registers.Agent(nullBunchKey, ruVerbsBunchKey, nullBunchKey, ruKanjiCorrelation, matchEndFlags))
-    insert(db, registers.Agent(ruVerbsBunchKey, ruGodanBunchKey, nullBunchKey, aruRoumajiCorrelation, matchEndFlags))
-    insert(db, registers.Agent(ruVerbsBunchKey, ruGodanBunchKey, nullBunchKey, oruRoumajiCorrelation, matchEndFlags))
-    insert(db, registers.Agent(ruVerbsBunchKey, ruGodanBunchKey, nullBunchKey, uruRoumajiCorrelation, matchEndFlags))
-    insert(db, registers.Agent(ruVerbsBunchKey, ichidanBunchKey, ruGodanBunchKey, nullCorrelationId, matchEndFlags))
+    insertAndAssert(db, registers.Agent(nullBunchKey, ruVerbsBunchKey, nullBunchKey, ruKanjiCorrelation, matchEndFlags))
+    insertAndAssert(db, registers.Agent(ruVerbsBunchKey, ruGodanBunchKey, nullBunchKey, aruRoumajiCorrelation, matchEndFlags))
+    insertAndAssert(db, registers.Agent(ruVerbsBunchKey, ruGodanBunchKey, nullBunchKey, oruRoumajiCorrelation, matchEndFlags))
+    insertAndAssert(db, registers.Agent(ruVerbsBunchKey, ruGodanBunchKey, nullBunchKey, uruRoumajiCorrelation, matchEndFlags))
+    insertAndAssert(db, registers.Agent(ruVerbsBunchKey, ichidanBunchKey, ruGodanBunchKey, nullCorrelationId, matchEndFlags))
 
     val removeEndFlags = Agent.Flags.removeEnd
-    insert(db, registers.Agent(uGodanBunchKey, preInformalPastBunchKey, nullBunchKey, uKanaCorrelation, removeEndFlags))
-    insert(db, registers.Agent(ruGodanBunchKey, preInformalPastBunchKey, nullBunchKey, uKanaCorrelation, removeEndFlags))
+    insertAndAssert(db, registers.Agent(uGodanBunchKey, preInformalPastBunchKey, nullBunchKey, uKanaCorrelation, removeEndFlags))
+    insertAndAssert(db, registers.Agent(ruGodanBunchKey, preInformalPastBunchKey, nullBunchKey, uKanaCorrelation, removeEndFlags))
 
     val appendFlags = Agent.Flags.append
-    insert(db, registers.Agent(preInformalPastBunchKey, informalPastBunchKey, nullBunchKey, ttaKanaCorrelation, appendFlags))
+    insertAndAssert(db, registers.Agent(preInformalPastBunchKey, informalPastBunchKey, nullBunchKey, ttaKanaCorrelation, appendFlags))
 
     val reversedTexts = texts.map(_.swap)
     updateWordTexts(db, reversedTexts)
@@ -756,7 +756,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
       val newSymbolArrays = newWordTexts.map(_.map(c => registers.SymbolPosition(allSymbols(c.toInt))))
       val newIds = insertCollections(db, newSymbolArrays)
       for (pair <- newWordTexts zip newIds) {
-        insert(db, redundant.Text(pair._2, pair._1))
+        insertAndAssert(db, redundant.Text(pair._2, pair._1))
         texts += pair
       }
     }
@@ -782,12 +782,12 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
 
     for (acceptation <- acceptations) {
-      insert(db, registers.AcceptationRepresentation(acceptation, representation))
+      insertAndAssert(db, registers.AcceptationRepresentation(acceptation, representation))
     }
   }
 
   private def insertNewKanjiRepresentation(db: SQLiteDatabase, word: Key, kanjiAlphabet: Key, representation: Register.CollectionId): Unit = {
-    insert(db, registers.WordRepresentation(word, kanjiAlphabet, representation))
+    insertAndAssert(db, registers.WordRepresentation(word, kanjiAlphabet, representation))
   }
 
   private def moveRepresentationFromWordToItsAcceptations(db: SQLiteDatabase, jaWord: Key, kanjiAlphabet: Key, acceptations: Iterable[Key]): Unit = {
@@ -797,7 +797,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
       representation <- wordRepresentations.values.map(_.symbolArray)
       acceptation <- acceptations
     } {
-      insert(db, registers.AcceptationRepresentation(acceptation, representation))
+      insertAndAssert(db, registers.AcceptationRepresentation(acceptation, representation))
     }
 
     for (key <- wordRepresentations.keySet) {
@@ -829,7 +829,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
         insertNewKanjiRepresentation(db, jaWord, kanjiAlphabet, representation)
 
         for (inputConcept <- inputConcepts) {
-          insert(db, registers.Acceptation(jaWord, inputConcept))
+          insertAndAssert(db, registers.Acceptation(jaWord, inputConcept))
         }
       }
       else { // Both sets contains elements that are not contained in the other
@@ -930,7 +930,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
           val jaWord = jaWordOption.getOrElse {
             val wordKey = insert(db, registers.Word(japaneseKey)).get
-            insert(db, registers.WordRepresentation(wordKey, kanaKey, ids(1)))
+            insertAndAssert(db, registers.WordRepresentation(wordKey, kanaKey, ids(1)))
             wordKey
           }
 
@@ -939,7 +939,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
             if (!spanishWords.contains(text)) {
               val key = insert(db, registers.Word(spanishKey)).get
               spanishWords(text) = key.index
-              insert(db, registers.WordRepresentation(key, spanishAlphabetKey, texts(text)))
+              insertAndAssert(db, registers.WordRepresentation(key, spanishAlphabetKey, texts(text)))
             }
           }
 
@@ -955,7 +955,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
             conceptOption.getOrElse {
               val concept = insert(db, registers.Concept(acceptationTexts.mkString(", "))).get
               for (wordKey <- wordKeys) {
-                insert(db, registers.Acceptation(wordKey, concept))
+                insertAndAssert(db, registers.Acceptation(wordKey, concept))
               }
               concept
             }
@@ -1125,9 +1125,13 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   }
 
   private def hasValidReference(db :SQLiteDatabase, register :Register) :Boolean = {
-    val fields = register.fields.collect { case field :ForeignKeyField => field }
-    fields.isEmpty || fields.forall { field =>
-      get(db, field.key).isDefined
+    val foreignKeys = register.fields.collect {
+      case field: ForeignKeyField => field.key
+      case field: NullableForeignKeyField if field.key.index != Register.nullIndex => field.key
+    }
+
+    foreignKeys.isEmpty || foreignKeys.forall { key =>
+      get(db, key).isDefined
     }
   }
 
@@ -1140,6 +1144,12 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
       find(db, register).lastOption
     }
     else None
+  }
+
+  private def insertAndAssert(db: SQLiteDatabase, register: Register): Unit = {
+    if (insert(db, register).isEmpty) {
+      throw new AssertionError("Unable to insert register " + register)
+    }
   }
 
   private def insert(db :SQLiteDatabase, coll :Register.CollectionId, register: Register): Unit = {
