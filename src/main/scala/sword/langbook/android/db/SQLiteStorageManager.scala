@@ -1595,15 +1595,14 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val wordTable = redundant.RedundantWord
     val wordTableName = tableName(wordTable)
 
-    val wordRefFieldName = fieldName(wordTable, redundant.RedundantWord.WordReferenceField)
+    val originalWordRefFieldName = fieldName(wordTable, redundant.RedundantWord.OriginalWordReferenceField)
     val redundantWordRefFieldName = fieldName(wordTextTable, wordTextTable.RedundantWordReferenceField)
     val charSequenceFieldName = fieldName(textTable, textTable.CharSequenceField)
     val textRefFieldName = fieldName(wordTextTable, wordTextTable.TextReferenceField)
 
-    val sqlQuery = s"SELECT $wordTableName.$wordRefFieldName,$textTableName.$charSequenceFieldName FROM $wordTextTableName " +
+    val sqlQuery = s"SELECT $wordTableName.$originalWordRefFieldName,$textTableName.$charSequenceFieldName FROM $wordTextTableName " +
       s"JOIN $textTableName ON $wordTextTableName.$textRefFieldName = $textTableName.${SQLiteStorageManager.idKey} " +
-      s"JOIN $wordTableName ON $wordTextTableName.$redundantWordRefFieldName = $wordTableName.${SQLiteStorageManager.idKey} " +
-      s"WHERE $wordTableName.$wordRefFieldName != 0"
+      s"JOIN $wordTableName ON $wordTextTableName.$redundantWordRefFieldName = $wordTableName.${SQLiteStorageManager.idKey}"
     val cursor = query(db, sqlQuery)
 
     val result = scala.collection.mutable.Map[Int, List[String]]()
