@@ -633,6 +633,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val nullBunchKey = obtainKey(registers.Bunch, Register.undefinedCollection, Register.nullIndex)
     val nullCorrelationId: Register.CollectionId = Register.undefinedCollection
 
+    val iAdjBunchKey = insert(db, registers.Bunch("i-adjective")).get
     val uGodanBunchKey = insert(db, registers.Bunch("Godan verb finishing in う")).get
     val kuGodanBunchKey = insert(db, registers.Bunch("Godan verb finishing in く")).get
     val ruVerbsBunchKey = insert(db, registers.Bunch("Verbs ending with る")).get
@@ -646,7 +647,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val informalPastBunchKey = insert(db, registers.Bunch("informal past")).get
 
     val correlationTexts = List(
-      "う", "く", "る",
+      "い", "う", "く", "る",
       "aru", "oru", "uru",
       "った"
     )
@@ -658,6 +659,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
 
     val arrayCorrelationIds = insertSymbolArrays(db, correlationTexts, symbols, texts).iterator
+    val iKanaSymbolArrayCollection = arrayCorrelationIds.next()
     val uKanaSymbolArrayCollection = arrayCorrelationIds.next()
     val kuKanaSymbolArrayCollection = arrayCorrelationIds.next()
     val ruKanaSymbolArrayCollection = arrayCorrelationIds.next()
@@ -665,6 +667,10 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val oruRoumajiSymbolArrayCollection = arrayCorrelationIds.next()
     val uruRoumajiSymbolArrayCollection = arrayCorrelationIds.next()
     val ttaKanaSymbolArrayCollection = arrayCorrelationIds.next()
+
+    val iKanaCorrelation = insert(db, List(
+      registers.Correlation(kanjiAlphabetKey, iKanaSymbolArrayCollection),
+      registers.Correlation(kanaAlphabetKey, iKanaSymbolArrayCollection))).get
 
     val uKanaCorrelation = insert(db, List(
       registers.Correlation(kanjiAlphabetKey, uKanaSymbolArrayCollection),
@@ -696,6 +702,8 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     )).get
 
     val matchEndFlags = Agent.Flags.matchEnd
+    // TODO: Exceptions for i-adj rule has to be added (e.g. kirai)
+    insertAndAssert(db, registers.Agent(nullBunchKey, iAdjBunchKey, nullBunchKey, iKanaCorrelation, matchEndFlags))
     insertAndAssert(db, registers.Agent(nullBunchKey, uGodanBunchKey, nullBunchKey, uKanaCorrelation, matchEndFlags))
     insertAndAssert(db, registers.Agent(nullBunchKey, kuGodanBunchKey, nullBunchKey, kuKanaCorrelation, matchEndFlags))
 
