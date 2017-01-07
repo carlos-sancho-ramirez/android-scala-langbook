@@ -462,32 +462,22 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val kanaJpText = "仮名"
     val kanaKanaText = "かな"
 
-    val uKanaText = "う"
-    val kuKanaText = "く"
-    val ruKanaText = "る"
-
-    val aruRoumajiText = "aru"
-    val oruRoumajiText = "oru"
-    val uruRoumajiText = "uru"
-
-    val ttaKanaText = "った"
-
     val string =
         enLanguageText + spLanguageText + kanjiLanguageText + kanaLanguageText +
         englishEnText + englishSpText + englishJpText + englishKanaText +
         spanishEnText + spanishSpText + spanishJpText + spanishKanaText +
         japaneseEnText + japaneseSpText + japaneseJpText + japaneseKanaText +
-        kanjiJpText + kanjiKanaText + kanaJpText + kanaKanaText + uKanaText + kuKanaText +
-        ruKanaText + aruRoumajiText + oruRoumajiText + uruRoumajiText + ttaKanaText
+        kanjiJpText + kanjiKanaText + kanaJpText + kanaKanaText
 
     val kana2RoumajiConversionList = sword.langbook.db.Word.hiraganaConversions
     val conversionCharacters = kana2RoumajiConversionList.map { case (a,b) => a + b }.mkString("")
-    val symbols = {
-      for {
-        symbol <- (conversionCharacters + string).toSet[Char]
-        key <- insert(db, registers.Symbol(symbol.toInt))
-      } yield (symbol, key)
-    }.toMap
+    val symbols = scala.collection.mutable.Map[Char, Key /* Symbol */]()
+    for {
+      symbol <- (conversionCharacters + string).toSet[Char]
+      key <- insert(db, registers.Symbol(symbol.toInt))
+    } {
+      symbols(symbol) = key
+    }
 
     val enAlphabetConceptKey = insertConcept(SQLiteStorageManager.englishAlphabetHint).get
     val enAlphabetKey = insert(db, registers.Alphabet(enAlphabetConceptKey)).get
@@ -629,12 +619,19 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val kana2RoumajiConversionArray = insert(db, kana2RoumajiPairs).get
     insertAndAssert(db, registers.Conversion(kanaAlphabetKey, roumajiAlphabetKey, kana2RoumajiConversionArray))
 
-    // Just here in case the autoincrement id algorithm starts giving the id 0. As id 0 is used for the whole database.
-    insertAndAssert(db, registers.Bunch("Unused"))
+    setJapaneseBunchesAndAgents(db, kanjiAlphabetKey, kanaAlphabetKey, roumajiAlphabetKey, symbols, texts)
 
-    // Temporal trial to test Agents
-    val nullBunchKey = obtainKey(registers.Bunch, 0, 0)
-    val nullCorrelationId: Register.CollectionId = 0
+    val reversedTexts = texts.map(_.swap)
+    updateWordTexts(db, reversedTexts)
+    updateResolvedBunches(db, reversedTexts)
+  }
+
+  private def setJapaneseBunchesAndAgents(db: SQLiteDatabase, kanjiAlphabetKey: StorageManager.Key,
+      kanaAlphabetKey: StorageManager.Key, roumajiAlphabetKey: StorageManager.Key,
+      symbols: scala.collection.mutable.Map[Char, Key], texts: scala.collection.mutable.Map[String, Register.CollectionId]): Unit = {
+
+    val nullBunchKey = obtainKey(registers.Bunch, Register.undefinedCollection, Register.nullIndex)
+    val nullCorrelationId: Register.CollectionId = Register.undefinedCollection
 
     val uGodanBunchKey = insert(db, registers.Bunch("Godan verb finishing in う")).get
     val kuGodanBunchKey = insert(db, registers.Bunch("Godan verb finishing in く")).get
@@ -649,42 +646,50 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val informalPastBunchKey = insert(db, registers.Bunch("informal past")).get
 
     val correlationTexts = List(
-      uKanaText, kuKanaText, ruKanaText,
-      aruRoumajiText, oruRoumajiText, uruRoumajiText,
-      ttaKanaText
+      "う", "く", "る",
+      "aru", "oru", "uru",
+      "った"
     )
+
+    for (c <- correlationTexts.mkString("")) {
+      if (!symbols.contains(c)) {
+        symbols(c) = insert(db, registers.Symbol(c.toInt)).get
+      }
+    }
+
     val arrayCorrelationIds = insertSymbolArrays(db, correlationTexts, symbols, texts).iterator
     val uKanaSymbolArrayCollection = arrayCorrelationIds.next()
-    val uKanaCorrelation = insert(db, List(
-        registers.Correlation(kanjiAlphabetKey, uKanaSymbolArrayCollection),
-        registers.Correlation(kanaAlphabetKey, uKanaSymbolArrayCollection))).get
-
     val kuKanaSymbolArrayCollection = arrayCorrelationIds.next()
+    val ruKanaSymbolArrayCollection = arrayCorrelationIds.next()
+    val aruRoumajiSymbolArrayCollection = arrayCorrelationIds.next()
+    val oruRoumajiSymbolArrayCollection = arrayCorrelationIds.next()
+    val uruRoumajiSymbolArrayCollection = arrayCorrelationIds.next()
+    val ttaKanaSymbolArrayCollection = arrayCorrelationIds.next()
+
+    val uKanaCorrelation = insert(db, List(
+      registers.Correlation(kanjiAlphabetKey, uKanaSymbolArrayCollection),
+      registers.Correlation(kanaAlphabetKey, uKanaSymbolArrayCollection))).get
+
     val kuKanaCorrelation = insert(db, List(
       registers.Correlation(kanjiAlphabetKey, kuKanaSymbolArrayCollection),
       registers.Correlation(kanaAlphabetKey, kuKanaSymbolArrayCollection))).get
 
-    val ruKanaSymbolArrayCollection = arrayCorrelationIds.next()
     val ruKanjiCorrelation = insert(db, List(
       registers.Correlation(kanjiAlphabetKey, ruKanaSymbolArrayCollection)
     )).get
 
-    val aruRoumajiSymbolArrayCollection = arrayCorrelationIds.next()
     val aruRoumajiCorrelation = insert(db, List(
       registers.Correlation(roumajiAlphabetKey, aruRoumajiSymbolArrayCollection)
     )).get
 
-    val oruRoumajiSymbolArrayCollection = arrayCorrelationIds.next()
     val oruRoumajiCorrelation = insert(db, List(
       registers.Correlation(roumajiAlphabetKey, oruRoumajiSymbolArrayCollection)
     )).get
 
-    val uruRoumajiSymbolArrayCollection = arrayCorrelationIds.next()
     val uruRoumajiCorrelation = insert(db, List(
       registers.Correlation(roumajiAlphabetKey, uruRoumajiSymbolArrayCollection)
     )).get
 
-    val ttaKanaSymbolArrayCollection = arrayCorrelationIds.next()
     val ttaKanaCorrelation = insert(db, List(
       registers.Correlation(kanjiAlphabetKey, ttaKanaSymbolArrayCollection),
       registers.Correlation(kanaAlphabetKey, ttaKanaSymbolArrayCollection)
@@ -706,10 +711,6 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
     val appendFlags = Agent.Flags.append
     insertAndAssert(db, registers.Agent(preInformalPastBunchKey, informalPastBunchKey, nullBunchKey, ttaKanaCorrelation, appendFlags))
-
-    val reversedTexts = texts.map(_.swap)
-    updateWordTexts(db, reversedTexts)
-    updateResolvedBunches(db, reversedTexts)
   }
 
   override def onCreate(db: SQLiteDatabase): Unit = {
