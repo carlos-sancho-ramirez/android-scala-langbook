@@ -363,7 +363,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   private def removeAllWordTexts(db: SQLiteDatabase): Unit = {
     val keys = keysFor(db, redundant.WordText)
     for (key <- keys) {
-      delete(db, key)
+      deleteAndAssert(db, key)
     }
   }
 
@@ -823,7 +823,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
 
     for (key <- wordRepresentations.keySet) {
-      delete(db, key)
+      deleteAndAssert(db, key)
     }
   }
 
