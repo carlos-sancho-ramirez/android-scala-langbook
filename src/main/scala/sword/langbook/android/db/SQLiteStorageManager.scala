@@ -135,21 +135,24 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   private def removeAllRedundantWords(db: SQLiteDatabase): Unit = {
     val keys = keysFor(db, redundant.RedundantWord)
     for (key <- keys) {
-      delete(db, key)
+      deleteAndAssert(db, key)
     }
   }
 
   private def copyWordsToRedundantWords(db: SQLiteDatabase): Unit = {
     val wordKeys = keysFor(db, registers.Word)
     for (wordKey <- wordKeys) {
-      insertAndAssert(db, redundant.RedundantWord(wordKey, wordKey))
+      val reg = redundant.RedundantWord(wordKey, wordKey)
+      if (find(db, reg).isEmpty) {
+        insertAndAssert(db, redundant.RedundantWord(wordKey, wordKey))
+      }
     }
   }
 
   private def removeAllResolvedBunches(db: SQLiteDatabase): Unit = {
     val keys = keysFor(db, redundant.ResolvedBunch)
     for (key <- keys) {
-      delete(db, key)
+      deleteAndAssert(db, key)
     }
   }
 
@@ -350,9 +353,6 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   }
 
   private def updateResolvedBunches(db: SQLiteDatabase, arrays: scala.collection.Map[Register.CollectionId, String]): Unit = {
-    removeAllRedundantWords(db)
-    copyWordsToRedundantWords(db)
-
     removeAllResolvedBunches(db)
     val agents = sortedAgents(db)
     for (agent <- agents) {
@@ -375,7 +375,12 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
         throw new AssertionError(s"A single text was expected to be found for symbol array ${wordRepr.symbolArray} but ${texts.size} were found")
       }
 
-      insertAndAssert(db, redundant.WordText(wordRepr.word, wordRepr.alphabet, texts.head._1))
+      val redundantWordKeys = keysFor(db, redundant.RedundantWord, redundant.RedundantWord.WordReferenceField(wordRepr.word))
+      if (redundantWordKeys.size != 1) {
+        throw new AssertionError(s"Found ${redundantWordKeys.size} redundant words pointing to word " + wordRepr.word)
+      }
+
+      insertAndAssert(db, redundant.WordText(redundantWordKeys.head, wordRepr.alphabet, texts.head._1))
     }
   }
 
@@ -419,7 +424,12 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
           val textKey = find(db, textReg).headOption.getOrElse {
             insert(db, redundant.Text(nullSymbolArray, newText)).get
           }
-          insertAndAssert(db, redundant.WordText(wordRepr.word, conversion.targetAlphabet, textKey))
+
+          val redundantWordKeys = keysFor(db, redundant.RedundantWord, redundant.RedundantWord.WordReferenceField(wordRepr.word))
+          if (redundantWordKeys.size != 1) {
+            throw new AssertionError("None or more that one redundant word has been found pointing to word " + wordRepr.word)
+          }
+          insertAndAssert(db, redundant.WordText(redundantWordKeys.head, conversion.targetAlphabet, textKey))
         }
       }
     }
@@ -621,6 +631,8 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
     setJapaneseBunchesAndAgents(db, kanjiAlphabetKey, kanaAlphabetKey, roumajiAlphabetKey, symbols, texts)
 
+    removeAllRedundantWords(db)
+    copyWordsToRedundantWords(db)
     val reversedTexts = texts.map(_.swap)
     updateWordTexts(db, reversedTexts)
     updateResolvedBunches(db, reversedTexts)
@@ -974,6 +986,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
           insertKanjiRepresentationAndPossibleAcceptations(db, jaWord, concepts.toSet, kanjiKey, ids.head)
         } while(cursor.moveToNext())
 
+        copyWordsToRedundantWords(db)
         val reversedTexts = texts.map(_.swap)
         updateWordTexts(db, reversedTexts)
         updateResolvedBunches(db, reversedTexts)
@@ -1323,6 +1336,12 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
       true
     }
     else false
+  }
+
+  private def deleteAndAssert(db: SQLiteDatabase, key: Key): Unit = {
+    if (!delete(db, key)) {
+      throw new AssertionError("Unable to delete register with key " + key)
+    }
   }
 
   private def getKeysForCollection(db: SQLiteDatabase, registerDefinition: CollectibleRegisterDefinition[Register], id: CollectionId): Set[Key] = {
