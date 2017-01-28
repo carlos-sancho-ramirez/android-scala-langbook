@@ -756,7 +756,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   private def insertNewSymbolsAndRetrieveSymbolMap(db: SQLiteDatabase, cursor: Cursor): Map[Register.UnicodeType, Key] = {
     val newSymbols = scala.collection.mutable.Set[Char]()
     do {
-      newSymbols ++= cursor.getString(0) ++= cursor.getString(1) ++= cursor.getString(2)
+      newSymbols ++= cursor.getString(1) ++= cursor.getString(2) ++= cursor.getString(3)
     } while(cursor.moveToNext())
 
     val currentSymbols = currentSymbolsInDatabase(db)
@@ -860,20 +860,49 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
   }
 
-  private def fromDbVersion3(db: SQLiteDatabase): Unit = {
-    import sword.langbook.db.registers
+  private def copyBunchesFromOldLists(db: SQLiteDatabase): scala.collection.Map[Int, Key] = {
+    val listBunchIdMap = scala.collection.mutable.Map[Int, Key]()
 
-    val listCursor = query(db, "ListRegister", Array("name"), null, null)
+    val listCursor = query(db, "ListRegister", Array("id", "name"), null, null)
     if (listCursor != null) try {
       if (listCursor.getCount > 0 && listCursor.moveToFirst()) do {
-        val listName = listCursor.getString(0)
-        insertAndAssert(db, registers.Bunch(listName))
+        val listId = listCursor.getInt(0)
+        val listName = listCursor.getString(1)
+        val bunchKey = insert(db, registers.Bunch(listName)).get
+        listBunchIdMap(listId) = bunchKey
       } while (listCursor.moveToNext())
     } finally {
       listCursor.close()
     }
 
-    val cursor = query(db, "WordRegister", Array("mWrittenWord", "mPronunciation", "meaning"),
+    listBunchIdMap
+  }
+
+  private def extractOldWordIdToBunchKeyMap(db: SQLiteDatabase, listBunchIdMap: scala.collection.Map[Int, Key]): Map[Int, Set[Key]] = {
+    val oldWordIdToBunchKeyMap = scala.collection.mutable.Map[Int, Set[Key]]()
+
+    val listChildCursor = query(db, "ListChildRegister", Array("listId", "childId"), "childRegisterIndex = 0", null)
+    if (listChildCursor != null) try {
+      if (listChildCursor.getCount > 0 && listChildCursor.moveToFirst()) do {
+        val listId = listChildCursor.getInt(0)
+        val wordId = listChildCursor.getInt(1)
+        val set = oldWordIdToBunchKeyMap.getOrElse(wordId, Set[Key]())
+        val bunchKey = listBunchIdMap(listId)
+        oldWordIdToBunchKeyMap(wordId) = set + bunchKey
+      } while (listChildCursor.moveToNext())
+    } finally {
+      listChildCursor.close()
+    }
+
+    oldWordIdToBunchKeyMap.toMap
+  }
+
+  private def fromDbVersion3(db: SQLiteDatabase): Unit = {
+    import sword.langbook.db.registers
+
+    val oldWordIdToBunchKeyMap = extractOldWordIdToBunchKeyMap(db, copyBunchesFromOldLists(db))
+
+    val cursor = query(db, "WordRegister", Array("id", "mWrittenWord", "mPronunciation", "meaning"),
       null, null)
 
     if (cursor != null) try {
@@ -919,9 +948,10 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
         val spanishWords = scala.collection.mutable.Map[String, Register.Index]()
 
         do {
-          val writtenText = cursor.getString(0)
-          val kanaText = cursor.getString(1)
-          val givenMeaning = cursor.getString(2)
+          val oldId = cursor.getInt(0)
+          val writtenText = cursor.getString(1)
+          val kanaText = cursor.getString(2)
+          val givenMeaning = cursor.getString(3)
 
           // From Db version 3 it is possible to find in the meaning field semicolon ';' characters.
           // semicolons are used here to separate different acceptations for the same word.
@@ -994,6 +1024,11 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
           }
 
           insertKanjiRepresentationAndPossibleAcceptations(db, jaWord, concepts.toSet, kanjiKey, ids.head)
+
+          // Add word to its bunch if there was a list for it
+          for (bunchKey <- oldWordIdToBunchKeyMap.getOrElse(oldId, Set[Key]())) {
+            insertAndAssert(db, registers.BunchWord(bunchKey, jaWord))
+          }
         } while(cursor.moveToNext())
 
         copyWordsToRedundantWords(db)
