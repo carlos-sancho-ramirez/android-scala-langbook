@@ -863,6 +863,16 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   private def fromDbVersion3(db: SQLiteDatabase): Unit = {
     import sword.langbook.db.registers
 
+    val listCursor = query(db, "ListRegister", Array("name"), null, null)
+    if (listCursor != null) try {
+      if (listCursor.getCount > 0 && listCursor.moveToFirst()) do {
+        val listName = listCursor.getString(0)
+        insertAndAssert(db, registers.Bunch(listName))
+      } while (listCursor.moveToNext())
+    } finally {
+      listCursor.close()
+    }
+
     val cursor = query(db, "WordRegister", Array("mWrittenWord", "mPronunciation", "meaning"),
       null, null)
 
