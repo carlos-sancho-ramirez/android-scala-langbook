@@ -6,17 +6,24 @@ import sword.langbook.android.viewholders._
 import sword.langbook.db.{Language, Word}
 
 case class WordDetailsAdapter(activity: BaseActivity, alphabets: IndexedSeq[String], language: Language,
-    acceptations: IndexedSeq[String], synonyms: IndexedSeq[Word], translations: IndexedSeq[Word])
-    extends RecyclerView.Adapter[BaseViewHolder] {
+    acceptations: IndexedSeq[String], bunches: IndexedSeq[String], synonyms: IndexedSeq[Word],
+    translations: IndexedSeq[Word]) extends RecyclerView.Adapter[BaseViewHolder] {
 
   val alphabetsSectionCount = {
     val size = alphabets.size
     if (size > 1) 1 + size else 0
   }
+
   val languageSectionCount = 2
 
   val acceptationsSectionCount = {
     val size = acceptations.size
+    if (size > 0) 1 + size
+    else 0
+  }
+
+  val bunchesSectionCount = {
+    val size = bunches.size
     if (size > 0) 1 + size
     else 0
   }
@@ -38,6 +45,7 @@ case class WordDetailsAdapter(activity: BaseActivity, alphabets: IndexedSeq[Stri
     val alphabets = "Alphabets"
     val language = "Language"
     val acceptations = "Acceptations"
+    val bunches = "Bunches"
     val synonyms = "Synonyms"
     val translations = "Translations"
   }
@@ -61,6 +69,11 @@ case class WordDetailsAdapter(activity: BaseActivity, alphabets: IndexedSeq[Stri
       currentPos += acceptationsSectionCount
     }
 
+    if (bunchesSectionCount > 0) {
+      map += currentPos -> sectionTitles.bunches
+      currentPos += bunchesSectionCount
+    }
+
     if (synonymsSectionCount > 0) {
       map += currentPos -> sectionTitles.synonyms
       currentPos += synonymsSectionCount
@@ -76,7 +89,7 @@ case class WordDetailsAdapter(activity: BaseActivity, alphabets: IndexedSeq[Stri
 
   override val getItemCount = {
     alphabetsSectionCount + languageSectionCount + synonymsSectionCount + translationsSectionCount +
-      acceptationsSectionCount
+      acceptationsSectionCount + bunchesSectionCount
   }
 
   override def getItemViewType(position: Int) = {
@@ -115,6 +128,9 @@ case class WordDetailsAdapter(activity: BaseActivity, alphabets: IndexedSeq[Stri
           case sectionTitles.acceptations =>
             holder.textView.setClickable(false)
             acceptations(relPosition)
+          case sectionTitles.bunches =>
+            holder.textView.setClickable(false)
+            bunches(relPosition)
           case sectionTitles.synonyms =>
             val synonym = synonyms(relPosition)
             holder.textView.setClickable(true)

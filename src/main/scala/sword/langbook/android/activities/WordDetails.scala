@@ -57,11 +57,12 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
           .flatMap(_.wordsForLanguage(preferredLanguage).headOption)
           .flatMap(_.suitableText).toVector
 
+      val bunches = word.bunches.map(_.name).toVector
       val synonyms = word.synonyms.toVector
       val translations = word.translations.toVector
 
       findView(TR.recyclerView).setAdapter(new WordDetailsAdapter(this, alphabetStrings, language,
-        acceptations, synonyms, translations))
+        acceptations, bunches, synonyms, translations))
     }
   }
 
