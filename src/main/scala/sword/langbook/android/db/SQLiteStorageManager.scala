@@ -149,6 +149,20 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
   }
 
+  private def copyBunchWordsToResolvedBunches(db: SQLiteDatabase): Unit = {
+    for (bunchWord <- getMapFor(db, registers.BunchWord).values) {
+      val redundantWordKeys = getMapFor(db, redundant.RedundantWord, redundant.RedundantWord.OriginalWordReferenceField(bunchWord.word)).filter(_._2.word == bunchWord.word).keys
+      if (redundantWordKeys.size != 1) {
+        throw new AssertionError("Found " + redundantWordKeys.size + " redundant words for word " + bunchWord)
+      }
+
+      val reg = redundant.ResolvedBunch(bunchWord.bunch, redundantWordKeys.head)
+      if (find(db, reg).isEmpty) {
+        insertAndAssert(db, reg)
+      }
+    }
+  }
+
   private def removeAllResolvedBunches(db: SQLiteDatabase): Unit = {
     val keys = keysFor(db, redundant.ResolvedBunch)
     for (key <- keys) {
@@ -353,7 +367,6 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   }
 
   private def updateResolvedBunches(db: SQLiteDatabase, arrays: scala.collection.Map[Register.CollectionId, String]): Unit = {
-    removeAllResolvedBunches(db)
     val agents = sortedAgents(db)
     for (agent <- agents) {
       processAgent(db, agent, arrays)
@@ -635,6 +648,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     copyWordsToRedundantWords(db)
     val reversedTexts = texts.map(_.swap)
     updateWordTexts(db, reversedTexts)
+    removeAllResolvedBunches(db)
     updateResolvedBunches(db, reversedTexts)
   }
 
@@ -1032,6 +1046,9 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
         } while(cursor.moveToNext())
 
         copyWordsToRedundantWords(db)
+        removeAllResolvedBunches(db)
+        copyBunchWordsToResolvedBunches(db)
+
         val reversedTexts = texts.map(_.swap)
         updateWordTexts(db, reversedTexts)
         updateResolvedBunches(db, reversedTexts)
