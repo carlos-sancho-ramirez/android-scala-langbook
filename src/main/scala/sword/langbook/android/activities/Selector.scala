@@ -74,8 +74,17 @@ class Selector extends BaseActivity with AdapterView.OnItemClickListener with Se
         else LayoutInflater.from(parent.getContext).inflate(R.layout.selector_entry, parent, false)
       }
 
-      val text = _items(position).suitableText.getOrElse("")
-      view.findView(TR.selectorEntry).setText(text)
+      val item = _items(position)
+      val text = item.suitableText.getOrElse("")
+      val icon = item match {
+        case _: Word => R.drawable.word_checked
+        case _: Bunch => R.drawable.list_checked
+        case _ => 0
+      }
+
+      val textView = view.findView(TR.selectorEntry)
+      textView.setCompoundDrawablesWithIntrinsicBounds(icon, 0, 0, 0)
+      textView.setText(text)
       view
     }
 
