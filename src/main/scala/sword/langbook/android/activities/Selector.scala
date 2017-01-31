@@ -2,26 +2,41 @@ package sword.langbook.android.activities
 
 import java.util.Locale
 
-import android.app.{SearchManager, Activity}
+import android.app.{Activity, SearchManager}
 import android.content.{Context, Intent}
 import android.os.Bundle
 import android.support.v7.widget.SearchView
 import android.view._
-import android.widget.{AbsListView, BaseAdapter, AdapterView}
+import android.widget.{AbsListView, AdapterView, BaseAdapter}
 import sword.db.ForeignKeyField
-import sword.langbook.android.{TR, R}
+import sword.langbook.android.{R, TR}
 import sword.langbook.android.TypedResource._
-import sword.langbook.db.{Word, registers}
+import sword.langbook.db.{Bunch, Selectable, Word, registers}
 
 import scala.collection.Set
 
 object Selector {
   private val className = "sword.langbook.android.activities.Selector"
 
-  def openWith(activity :Activity, requestCode :Int = 0) = {
+  sealed class VisibilityFlags private[Selector] (val intValue: Int) {
+    def showWords = (intValue & 1) != 0
+    def showBunches = (intValue & 2) != 0
+
+    override def hashCode = intValue
+    override def equals(other: Any) =
+        other != null && other.isInstanceOf[VisibilityFlags] &&
+        other.asInstanceOf[VisibilityFlags].intValue == intValue
+  }
+
+  val onlyWords = new VisibilityFlags(1)
+  val onlyBunches = new VisibilityFlags(2)
+  val wordsAndBunches = new VisibilityFlags(3)
+
+  def openWith(activity :Activity, visibilityFlags: VisibilityFlags, requestCode: Int = 0) = {
     val intent = new Intent()
     intent.setClassName(activity, className)
 
+    intent.putExtra(BundleKeys.visibilityFlags, visibilityFlags.intValue)
     if (requestCode > 0) activity.startActivityForResult(intent, requestCode)
     else activity.startActivity(intent)
   }
@@ -30,16 +45,22 @@ object Selector {
 class Selector extends BaseActivity with AdapterView.OnItemClickListener with SelectorChoiceModeCallback with SearchView.OnQueryTextListener {
 
   lazy val listView = findView(TR.listView)
+  lazy val visibilityFlags = new Selector.VisibilityFlags(getIntent.getIntExtra(
+      BundleKeys.visibilityFlags, Selector.wordsAndBunches.intValue))
 
   class Adapter extends BaseAdapter {
-    lazy val foundTexts = linkedDb.storageManager.allStringArray.map { case (x,y) => (Word(x), y)}
-    lazy val allTexts = foundTexts.map { case (word, texts) =>
+    def foundWordTexts = linkedDb.storageManager.allStringArray.map { case (x,y) => (Word(x), y)}
+    lazy val allWordTexts = foundWordTexts.map { case (word, texts) =>
       val newTexts = texts.flatMap(Word.normalisedText)
       (word, texts ++ newTexts)
     }
 
+    lazy val allBunchNames: Map[Bunch, String] = linkedDb.storageManager.getMapFor(registers.Bunch).map { case (key, reg) =>
+      (Bunch(key), reg.name)
+    }.toMap
+
     private var _query = ""
-    private var _items: IndexedSeq[Word] = evaluateItems(_query)
+    private var _items: IndexedSeq[Selectable] = evaluateItems(_query)
 
     override def getItemId(position: Int) = position
     override def getCount = _items.size
@@ -58,16 +79,34 @@ class Selector extends BaseActivity with AdapterView.OnItemClickListener with Se
       view
     }
 
-    private def evaluateItems(query: String): IndexedSeq[Word] = {
+    private def evaluateWords(query: String): IndexedSeq[Word] = {
       if (query != null && query.nonEmpty) {
         val normalisedQuery = query.toLowerCase(Locale.ENGLISH)
-        allTexts.flatMap {
+        allWordTexts.flatMap {
           case (word, strings) =>
             if (strings.exists(_.contains(normalisedQuery))) Some(word)
             else None
         }.toVector
       }
-      else allTexts.keySet.toVector
+      else allWordTexts.keySet.toVector
+    }
+
+    private def evaluateBunches(query: String): IndexedSeq[Bunch] = {
+      if (query != null && query.nonEmpty) {
+        val normalisedQuery = query.toLowerCase(Locale.ENGLISH)
+        allBunchNames.collect {
+          case (bunch, name) if name.contains(normalisedQuery) => bunch
+        }.toVector
+      }
+      else allBunchNames.keySet.toVector
+    }
+
+    private def evaluateItems(query: String): IndexedSeq[Selectable] = {
+      visibilityFlags match {
+        case Selector.onlyWords => evaluateWords(query)
+        case Selector.onlyBunches => evaluateBunches(query)
+        case Selector.wordsAndBunches => evaluateWords(query) ++ evaluateBunches(query)
+      }
     }
 
     private def updateItems(): Unit = {
@@ -128,8 +167,11 @@ class Selector extends BaseActivity with AdapterView.OnItemClickListener with Se
   }
 
   override def onItemClick(parent: AdapterView[_], view: View, position: Int, id: Long): Unit = {
-    val word = parent.getAdapter.asInstanceOf[Adapter].getItem(position)
-    WordDetails.openWith(this, RequestCodes.checkWordDetails, word)
+    val item = parent.getAdapter.asInstanceOf[Adapter].getItem(position)
+    item match {
+      case word: Word => WordDetails.openWith(this, RequestCodes.checkWordDetails, word)
+      case _ =>
+    }
   }
 
   override def onActivityResult(requestCode :Int, resultCode :Int, data :Intent) :Unit = {

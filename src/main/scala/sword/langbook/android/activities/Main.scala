@@ -18,7 +18,7 @@ class Main extends BaseActivity {
     })
 
     findView(TR.checkWordsButton).setOnClickListener(new View.OnClickListener() {
-      override def onClick(v: View): Unit = Selector.openWith(Main.this)
+      override def onClick(v: View): Unit = Selector.openWith(Main.this, Selector.onlyWords)
     })
 
     findView(TR.startQuizButton).setOnClickListener(new View.OnClickListener() {
