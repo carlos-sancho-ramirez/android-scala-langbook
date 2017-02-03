@@ -1673,10 +1673,6 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     set.toSet
   }
 
-  override def allStringArray: Map[Key, List[String]] = {
-    withReadableDatabase(allStringArray)
-  }
-
   private def allStringArray(db: SQLiteDatabase): Map[Key, List[String]] = {
     val wordTextTable = redundant.WordText
     val wordTextTableName = tableName(wordTextTable)
@@ -1710,6 +1706,55 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
 
     result.map { case (x,y) => (obtainKey(sword.langbook.db.registers.Word, 0, x),y) }.toMap
+  }
+
+  override def allStringArray: Map[Key, List[String]] = {
+    withReadableDatabase(allStringArray)
+  }
+
+  private def allWordTexts(db: SQLiteDatabase, bunchKey: Key /* Word */): Map[Key /* Word */, List[String]] = {
+    val wordTextTable = redundant.WordText
+    val wordTextTableName = tableName(wordTextTable)
+    val textTable = redundant.Text
+    val textTableName = tableName(textTable)
+    val resolvedBunchTable = redundant.ResolvedBunch
+    val resolvedBunchTableName = tableName(resolvedBunchTable)
+    val wordTable = redundant.RedundantWord
+    val wordTableName = tableName(wordTable)
+
+    val originalWordRefFieldName = fieldName(wordTable, redundant.RedundantWord.OriginalWordReferenceField)
+    val bunchRefFieldName = fieldName(resolvedBunchTable, redundant.ResolvedBunch.BunchReferenceField)
+    val bunchWordRefFieldName = fieldName(resolvedBunchTable, redundant.ResolvedBunch.RedundantWordReferenceField)
+    val redundantWordRefFieldName = fieldName(wordTextTable, wordTextTable.RedundantWordReferenceField)
+    val charSequenceFieldName = fieldName(textTable, textTable.CharSequenceField)
+    val textRefFieldName = fieldName(wordTextTable, wordTextTable.TextReferenceField)
+
+    val sqlQuery = s"SELECT $wordTableName.$originalWordRefFieldName,$textTableName.$charSequenceFieldName FROM $resolvedBunchTableName " +
+      s"JOIN $wordTextTableName ON $resolvedBunchTableName.$bunchWordRefFieldName = $wordTextTableName.$redundantWordRefFieldName " +
+      s"JOIN $textTableName ON $wordTextTableName.$textRefFieldName = $textTableName.${SQLiteStorageManager.idKey} " +
+      s"JOIN $wordTableName ON $resolvedBunchTableName.$bunchWordRefFieldName = $wordTableName.${SQLiteStorageManager.idKey} " +
+      s"WHERE $resolvedBunchTableName.$bunchRefFieldName = ${bunchKey.index}"
+    val cursor = query(db, sqlQuery)
+
+    val result = scala.collection.mutable.Map[Int, List[String]]()
+    if (cursor != null) try {
+      if (cursor.getCount > 0 && cursor.moveToFirst()) {
+        do {
+          val wordId = cursor.getInt(0)
+          val str = cursor.getString(1)
+          val list = str :: result.getOrElse(wordId, List())
+          result(wordId) = list
+        } while(cursor.moveToNext())
+      }
+    } finally {
+      cursor.close()
+    }
+
+    result.map { case (x,y) => (obtainKey(sword.langbook.db.registers.Word, 0, x),y) }.toMap
+  }
+
+  override def allWordTexts(bunch: Key /* Word */): Map[Key /* Word */, List[String]] = {
+    withReadableDatabase(db => allWordTexts(db, bunch))
   }
 
   override def isConceptDuplicated(alphabet: Key): Boolean = {

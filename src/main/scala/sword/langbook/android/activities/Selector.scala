@@ -29,14 +29,17 @@ object Selector {
   }
 
   val onlyWords = new VisibilityFlags(1)
-  val onlyBunches = new VisibilityFlags(2)
   val wordsAndBunches = new VisibilityFlags(3)
 
-  def openWith(activity :Activity, visibilityFlags: VisibilityFlags, requestCode: Int = 0) = {
+  def openWith(activity :Activity, visibilityFlags: VisibilityFlags, bunch: Bunch = null, requestCode: Int = 0) = {
     val intent = new Intent()
     intent.setClassName(activity, className)
 
     intent.putExtra(BundleKeys.visibilityFlags, visibilityFlags.intValue)
+    if (bunch != null) {
+      intent.putExtra(BundleKeys.bunchKey, bunch.key.encoded)
+    }
+
     if (requestCode > 0) activity.startActivityForResult(intent, requestCode)
     else activity.startActivity(intent)
   }
@@ -48,8 +51,18 @@ class Selector extends BaseActivity with AdapterView.OnItemClickListener with Se
   lazy val visibilityFlags = new Selector.VisibilityFlags(getIntent.getIntExtra(
       BundleKeys.visibilityFlags, Selector.wordsAndBunches.intValue))
 
+  lazy val bunchKeyOption = linkedDb.storageManager
+      .decode(getIntent.getStringExtra(BundleKeys.bunchKey))
+
   class Adapter extends BaseAdapter {
-    def foundWordTexts = linkedDb.storageManager.allStringArray.map { case (x,y) => (Word(x), y)}
+    def wordTexts = {
+      val manager = linkedDb.storageManager
+      if (bunchKeyOption.isDefined) manager.allWordTexts(bunchKeyOption.get)
+      else manager.allStringArray
+    }
+
+    def foundWordTexts = wordTexts.map { case (x,y) => (Word(x), y)}
+
     lazy val allWordTexts = foundWordTexts.map { case (word, texts) =>
       val newTexts = texts.flatMap(Word.normalisedText)
       (word, texts ++ newTexts)
@@ -111,10 +124,11 @@ class Selector extends BaseActivity with AdapterView.OnItemClickListener with Se
     }
 
     private def evaluateItems(query: String): IndexedSeq[Selectable] = {
-      visibilityFlags match {
-        case Selector.onlyWords => evaluateWords(query)
-        case Selector.onlyBunches => evaluateBunches(query)
-        case Selector.wordsAndBunches => evaluateWords(query) ++ evaluateBunches(query)
+      if (bunchKeyOption.isDefined || visibilityFlags == Selector.onlyWords) {
+        evaluateWords(query)
+      }
+      else {
+        evaluateWords(query) ++ evaluateBunches(query)
       }
     }
 
@@ -179,7 +193,7 @@ class Selector extends BaseActivity with AdapterView.OnItemClickListener with Se
     val item = parent.getAdapter.asInstanceOf[Adapter].getItem(position)
     item match {
       case word: Word => WordDetails.openWith(this, RequestCodes.checkWordDetails, word)
-      case _ =>
+      case bunch: Bunch => Selector.openWith(this, Selector.wordsAndBunches, bunch = bunch)
     }
   }
 

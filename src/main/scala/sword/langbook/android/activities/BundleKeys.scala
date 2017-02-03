@@ -2,6 +2,7 @@ package sword.langbook.android.activities
 
 object BundleKeys {
   val alphabetKey = "ak"
+  val bunchKey = "bk"
   val conceptKey = "ck"
   val conceptKeys = "cks"
   val excludedLanguageKey = "elk"
