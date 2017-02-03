@@ -53,6 +53,7 @@ class Selector extends BaseActivity with AdapterView.OnItemClickListener with Se
 
   lazy val bunchKeyOption = linkedDb.storageManager
       .decode(getIntent.getStringExtra(BundleKeys.bunchKey))
+  lazy val bunchOption = bunchKeyOption.map(Bunch(_))
 
   class Adapter extends BaseAdapter {
     def wordTexts = {
@@ -165,7 +166,10 @@ class Selector extends BaseActivity with AdapterView.OnItemClickListener with Se
     invalidateAdapter()
 
     val toolBar = findView(TR.toolBar)
-    toolBar.setTitle(R.string.appName)
+    for (bunch <- bunchOption) {
+      toolBar.setTitle(bunch.name)
+    }
+
     setSupportActionBar(toolBar)
   }
 
