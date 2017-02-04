@@ -60,9 +60,10 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
       val bunches = word.bunches.map(_.name).toVector
       val synonyms = word.synonyms.toVector
       val translations = word.translations.toVector
+      val morphologies = word.morphologies
 
       findView(TR.recyclerView).setAdapter(new WordDetailsAdapter(this, alphabetStrings, language,
-        acceptations, bunches, synonyms, translations))
+        acceptations, bunches, synonyms, translations, morphologies))
     }
   }
 

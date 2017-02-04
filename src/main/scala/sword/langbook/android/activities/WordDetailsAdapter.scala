@@ -7,7 +7,7 @@ import sword.langbook.db.{Language, Word}
 
 case class WordDetailsAdapter(activity: BaseActivity, alphabets: IndexedSeq[String], language: Language,
     acceptations: IndexedSeq[String], bunches: IndexedSeq[String], synonyms: IndexedSeq[Word],
-    translations: IndexedSeq[Word]) extends RecyclerView.Adapter[BaseViewHolder] {
+    translations: IndexedSeq[Word], morphologies: Map[String, String]) extends RecyclerView.Adapter[BaseViewHolder] {
 
   val alphabetsSectionCount = {
     val size = alphabets.size
@@ -40,6 +40,12 @@ case class WordDetailsAdapter(activity: BaseActivity, alphabets: IndexedSeq[Stri
     else 0
   }
 
+  val morphologiesSectionCount = {
+    val size = morphologies.size
+    if (size > 0) 1 + size
+    else 0
+  }
+
   // TODO: This titles should not be hardcoded
   object sectionTitles {
     val alphabets = "Alphabets"
@@ -48,6 +54,7 @@ case class WordDetailsAdapter(activity: BaseActivity, alphabets: IndexedSeq[Stri
     val bunches = "Bunches"
     val synonyms = "Synonyms"
     val translations = "Translations"
+    val morphologies = "Morphologies"
   }
 
   val sectionHeaderPositions = {
@@ -84,12 +91,17 @@ case class WordDetailsAdapter(activity: BaseActivity, alphabets: IndexedSeq[Stri
       currentPos += translationsSectionCount
     }
 
+    if (morphologiesSectionCount > 0) {
+      map += currentPos -> sectionTitles.morphologies
+      currentPos += morphologiesSectionCount
+    }
+
     map.toMap
   }
 
   override val getItemCount = {
     alphabetsSectionCount + languageSectionCount + synonymsSectionCount + translationsSectionCount +
-      acceptationsSectionCount + bunchesSectionCount
+      acceptationsSectionCount + bunchesSectionCount + morphologiesSectionCount
   }
 
   override def getItemViewType(position: Int) = {
@@ -149,6 +161,10 @@ case class WordDetailsAdapter(activity: BaseActivity, alphabets: IndexedSeq[Stri
               }
             })
             translation.suitableText.getOrElse("")
+          case sectionTitles.morphologies =>
+            holder.textView.setClickable(false)
+            val pair = morphologies.toList(relPosition)
+            pair._1 + ": " + pair._2
         }
 
         holder.textView.setText(text)
