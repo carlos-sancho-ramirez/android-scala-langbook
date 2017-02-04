@@ -1585,6 +1585,10 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     withReadableDatabase(getKeysForArray(_, registerDefinition, id))
   }
 
+  override def getMapFor[R <: Register](registerDefinition: RegisterDefinition[R]): scala.collection.Map[Key, R] = {
+    withReadableDatabase(getMapFor(_, registerDefinition))
+  }
+
   override def getMapFor[R <: Register](registerDefinition: RegisterDefinition[R], filter: Field): scala.collection.Map[Key, R] = {
     withReadableDatabase(getMapFor(_, registerDefinition, filter))
   }
