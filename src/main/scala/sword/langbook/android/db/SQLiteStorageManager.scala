@@ -202,8 +202,9 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
       redundantWordKeys: Set[Key /* RedundantWord */],
       symbolArrays: scala.collection.Map[Register.CollectionId, String],
       texts: scala.collection.Map[Key /* Text */, String],
-      correlation: Map[Key /* Alphabet */, String],
-      f: (String, String) => String): Set[Key /* RedundantWord */] = {
+      matchCorrelation: Map[Key /* Alphabet */, String],
+      addCorrelation: Map[Key /* Alphabet */, String],
+      f: (String, String, String) => String): Set[Key /* RedundantWord */] = {
 
     val nullWordKey = obtainKey(registers.Word, Register.undefinedCollection, Register.nullIndex)
     val nullSymbolArray: Register.CollectionId = 0
@@ -218,9 +219,9 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
       }
 
       val modifiedWordTextMap = scala.collection.mutable.Map[Key /* Alphabet */, String]()
-      for ((alphabet, text) <- correlation) {
+      for ((alphabet, text) <- matchCorrelation) {
         val originalText = texts(wordTextMap(alphabet))
-        modifiedWordTextMap(alphabet) = f(originalText, text)
+        modifiedWordTextMap(alphabet) = f(originalText, text, addCorrelation.getOrElse(alphabet, ""))
       }
 
       val missingAlphabets = wordTextMap.keySet diff modifiedWordTextMap.keySet
@@ -261,6 +262,19 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     result.toSet
   }
 
+  private def retrieveCorrelation(
+      db: SQLiteDatabase,
+      arrays: scala.collection.Map[Register.CollectionId, String],
+      nullCorrelation: Register.CollectionId
+    )(correlation: Register.CollectionId): Map[Key /* Alphabet */, String] = {
+
+    if (correlation != nullCorrelation) {
+      getCollection(db, registers.Correlation, correlation)
+        .map(e => (e.alphabet, arrays(e.symbolArray))).toMap
+    }
+    else Map[StorageManager.Key, String]()
+  }
+
   /**
    * Fill the resolvedBunch redundant register for the given agent
    */
@@ -280,13 +294,9 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
       }
     }
 
-    val correlation = {
-      if (agent.correlation != nullCorrelation) {
-        getCollection(db, registers.Correlation, agent.correlation)
-          .map(e => (e.alphabet, arrays(e.symbolArray))).toMap
-      }
-      else Map[StorageManager.Key, String]()
-    }
+    val correlationRetriever: (Register.CollectionId) => Map[Key /* Alphabet */, String] = retrieveCorrelation(db, arrays, nullCorrelation)
+    val matchCorrelation = correlationRetriever(agent.matchCorrelation)
+    val addCorrelation = correlationRetriever(agent.addCorrelation)
 
     val texts = scala.collection.mutable.Map[Key, String]()
     for ((key, textReg) <- getMapFor(db, redundant.Text)) {
@@ -294,20 +304,20 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     }
 
     val filteredWords: Set[Key /* RedundantWord */] = {
-      if (Agent.Flags.shouldFilterFromSource(agent.flags)) {
+      if (matchCorrelation.nonEmpty) {
         val result = ListBuffer[Key]()
+
+        val f = {
+          if (Agent.Flags.startSide(agent.flags)) (a: String, b: String) => a.startsWith(b)
+          else (a: String, b: String) => a.endsWith(b)
+        }
 
         for (word <- sourceWords) {
           // TODO: AcceptationRepresentation should be taken into account as well
           val wordTexts = getMapFor(db, redundant.WordText, redundant.WordText.RedundantWordReferenceField(word)).values
           val alphabets = wordTexts.map(_.alphabet).toSet
-          if (correlation.keySet.forall(alphabets)) {
-            val f = {
-              if (Agent.Flags.startSide(agent.flags)) (a: String, b: String) => a.startsWith(b)
-              else (a: String, b: String) => a.endsWith(b)
-            }
-
-            if (correlation.forall { case (alphabet, correlationText) =>
+          if (matchCorrelation.keySet.forall(alphabets)) {
+            if (matchCorrelation.forall { case (alphabet, correlationText) =>
               wordTexts.filter(_.alphabet == alphabet).exists(repr => f(texts(repr.text), correlationText))
             }) {
               result += word
@@ -333,30 +343,28 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
     val modifiedSet = {
       if (Agent.Flags.shouldModify(agent.flags)) {
-        val f: (String, String) => String = agent.flags match {
-          case Agent.Flags.removeStart =>
-            (originalText, text) => {
-              if (!originalText.startsWith(text)) {
-                throw new AssertionError(s"Unable to remove '$text' at the start of '$originalText'")
+        val f: (String, String, String) => String = {
+          if (Agent.Flags.startSide(agent.flags)) {
+            (originalText, removePrefix, prependText) => {
+              if (!originalText.startsWith(removePrefix)) {
+                throw new AssertionError(s"Unable to remove '$removePrefix' at the start of '$originalText'")
               }
 
-              originalText.substring(text.length)
+              prependText + originalText.substring(removePrefix.length)
             }
-
-          case Agent.Flags.removeEnd =>
-            (originalText, text) => {
-              if (!originalText.endsWith(text)) {
-                throw new AssertionError(s"Unable to remove '$text' at the end of '$originalText'")
+          }
+          else {
+            (originalText, removeSuffix, appendText) => {
+              if (!originalText.endsWith(removeSuffix)) {
+                throw new AssertionError(s"Unable to remove '$removeSuffix' at the end of '$originalText'")
               }
 
-              originalText.substring(0, originalText.length - text.length)
+              originalText.substring(0, originalText.length - removeSuffix.length) + appendText
             }
-
-          case Agent.Flags.append => (orig, text) => orig + text
-          case Agent.Flags.prepend => (orig, text) => text + orig
+          }
         }
 
-        modifyWord(db, resultSet, arrays, texts, correlation, f)
+        modifyWord(db, resultSet, arrays, texts, matchCorrelation, addCorrelation, f)
       }
       else resultSet
     }
@@ -668,8 +676,6 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     // This is the target for some agents, but should include statically any -eru and -iru godan
     // verbs as rule exception
     val ruGodanBunchKey = insert(db, registers.Bunch("Godan verb ending with る")).get
-
-    val preInformalPastBunchKey = insert(db, registers.Bunch("Pre informal past")).get
     val informalPastBunchKey = insert(db, registers.Bunch("informal past")).get
 
     val correlationTexts = List(
@@ -729,22 +735,19 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
     val matchEndFlags = Agent.Flags.matchEnd
     // TODO: Exceptions for i-adj rule has to be added (e.g. kirai)
-    insertAndAssert(db, registers.Agent(nullBunchKey, iAdjBunchKey, nullBunchKey, iKanaCorrelation, matchEndFlags))
-    insertAndAssert(db, registers.Agent(nullBunchKey, uGodanBunchKey, nullBunchKey, uKanaCorrelation, matchEndFlags))
-    insertAndAssert(db, registers.Agent(nullBunchKey, kuGodanBunchKey, nullBunchKey, kuKanaCorrelation, matchEndFlags))
+    insertAndAssert(db, registers.Agent(nullBunchKey, iAdjBunchKey, nullBunchKey, iKanaCorrelation, nullCorrelationId, matchEndFlags))
+    insertAndAssert(db, registers.Agent(nullBunchKey, uGodanBunchKey, nullBunchKey, uKanaCorrelation, nullCorrelationId, matchEndFlags))
+    insertAndAssert(db, registers.Agent(nullBunchKey, kuGodanBunchKey, nullBunchKey, kuKanaCorrelation, nullCorrelationId, matchEndFlags))
 
-    insertAndAssert(db, registers.Agent(nullBunchKey, ruVerbsBunchKey, nullBunchKey, ruKanjiCorrelation, matchEndFlags))
-    insertAndAssert(db, registers.Agent(ruVerbsBunchKey, ruGodanBunchKey, nullBunchKey, aruRoumajiCorrelation, matchEndFlags))
-    insertAndAssert(db, registers.Agent(ruVerbsBunchKey, ruGodanBunchKey, nullBunchKey, oruRoumajiCorrelation, matchEndFlags))
-    insertAndAssert(db, registers.Agent(ruVerbsBunchKey, ruGodanBunchKey, nullBunchKey, uruRoumajiCorrelation, matchEndFlags))
-    insertAndAssert(db, registers.Agent(ruVerbsBunchKey, ichidanBunchKey, ruGodanBunchKey, nullCorrelationId, matchEndFlags))
+    insertAndAssert(db, registers.Agent(nullBunchKey, ruVerbsBunchKey, nullBunchKey, ruKanjiCorrelation, nullCorrelationId, matchEndFlags))
+    insertAndAssert(db, registers.Agent(ruVerbsBunchKey, ruGodanBunchKey, nullBunchKey, aruRoumajiCorrelation, nullCorrelationId, matchEndFlags))
+    insertAndAssert(db, registers.Agent(ruVerbsBunchKey, ruGodanBunchKey, nullBunchKey, oruRoumajiCorrelation, nullCorrelationId, matchEndFlags))
+    insertAndAssert(db, registers.Agent(ruVerbsBunchKey, ruGodanBunchKey, nullBunchKey, uruRoumajiCorrelation, nullCorrelationId, matchEndFlags))
+    insertAndAssert(db, registers.Agent(ruVerbsBunchKey, ichidanBunchKey, ruGodanBunchKey, nullCorrelationId, nullCorrelationId, matchEndFlags))
 
-    val removeEndFlags = Agent.Flags.removeEnd
-    insertAndAssert(db, registers.Agent(uGodanBunchKey, preInformalPastBunchKey, nullBunchKey, uKanaCorrelation, removeEndFlags))
-    insertAndAssert(db, registers.Agent(ruGodanBunchKey, preInformalPastBunchKey, nullBunchKey, uKanaCorrelation, removeEndFlags))
-
-    val appendFlags = Agent.Flags.append
-    insertAndAssert(db, registers.Agent(preInformalPastBunchKey, informalPastBunchKey, nullBunchKey, ttaKanaCorrelation, appendFlags))
+    val modifyEndFlags = Agent.Flags.modifyEnd
+    insertAndAssert(db, registers.Agent(uGodanBunchKey, informalPastBunchKey, nullBunchKey, uKanaCorrelation, ttaKanaCorrelation, modifyEndFlags))
+    insertAndAssert(db, registers.Agent(ruGodanBunchKey, informalPastBunchKey, nullBunchKey, uKanaCorrelation, ttaKanaCorrelation, modifyEndFlags))
   }
 
   override def onCreate(db: SQLiteDatabase): Unit = {
