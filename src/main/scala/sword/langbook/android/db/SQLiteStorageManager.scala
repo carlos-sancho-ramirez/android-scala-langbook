@@ -1645,6 +1645,62 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     set.toSet
   }
 
+  private def getForeignMap[R <: Register](
+      db: SQLiteDatabase,
+      sourceRegDef: RegisterDefinition[Register],
+      targetRegDef: RegisterDefinition[R],
+      filter: Field,
+      sourceJoinFieldDefinition: ForeignKeyFieldDefinition): scala.collection.Map[Key, R] = {
+
+    if (targetRegDef != sourceJoinFieldDefinition.target) {
+      throw new AssertionError("Wrong register definition")
+    }
+
+    val sourceTableName = tableName(sourceRegDef)
+    val targetTableName = tableName(sourceJoinFieldDefinition.target)
+
+    val columns = SQLiteStorageManager.idKey +: targetRegDef.fields.map(fieldName(targetRegDef, _))
+    val qualifiedColumns = columns.map(targetTableName + '.' + _).mkString(", ")
+
+    val sourceJoinFieldName = sourceTableName + '.' + fieldName(sourceRegDef, sourceJoinFieldDefinition)
+    val targetJoinFieldName = targetTableName + '.' + SQLiteStorageManager.idKey
+
+    val filterFieldName = sourceTableName + '.' + fieldName(sourceRegDef, filter.definition)
+    val filterValue = sqlValue(filter)
+
+    val sqlQuery = s"SELECT $qualifiedColumns FROM $sourceTableName JOIN $targetTableName " +
+      s"ON $sourceJoinFieldName = $targetJoinFieldName WHERE $filterFieldName = $filterValue"
+    val cursor = query(db, sqlQuery)
+
+    val result = scala.collection.mutable.Map[Key, R]()
+
+    if (cursor != null) try {
+      if (cursor.getCount > 0 && cursor.moveToFirst()) {
+        do {
+          val key = obtainKey(targetRegDef, Register.undefinedCollection, cursor.getInt(0))
+          val fieldValues = targetRegDef.fields.indices.map(index => cursor.getString(index + 1))
+          for (reg <- targetRegDef.from(fieldValues, keyExtractor)) {
+            result(key) = reg
+          }
+        } while(cursor.moveToNext())
+      }
+
+    } finally {
+      cursor.close()
+    }
+
+    result
+  }
+
+  override def getForeignMap[R <: Register](
+      regDef: RegisterDefinition[Register],
+      targetRegDef: RegisterDefinition[R],
+      filter: Field,
+      sourceJoinFieldDefinition: ForeignKeyFieldDefinition): scala.collection.Map[Key, R] = {
+
+    withReadableDatabase(db => getForeignMap(db, regDef, targetRegDef, filter, sourceJoinFieldDefinition))
+  }
+
   override def getJointSet[R <: Register](sourceRegDef: RegisterDefinition[Register], targetRegDef: RegisterDefinition[R], filter: ForeignKeyField, joinLeft: ForeignKeyFieldDefinition, joinRight: ForeignKeyFieldDefinition): Set[R] = {
 
     val sourceTableName = tableName(sourceRegDef)
