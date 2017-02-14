@@ -1099,8 +1099,8 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     mapFor(regDef, query(db, _, _, null, null))
   }
 
-  private def getMapFor[R <: Register](db: SQLiteDatabase, regDef: RegisterDefinition[R], filter: Field): scala.collection.Map[Key, R] = {
-    val whereClause = s"${fieldName(regDef, filter)}=${sqlValue(filter)}"
+  private def getMapFor[R <: Register](db: SQLiteDatabase, regDef: RegisterDefinition[R], filters: Field*): scala.collection.Map[Key, R] = {
+    val whereClause = filters.map(filter => s"${fieldName(regDef, filter)}=${sqlValue(filter)}").mkString(" AND ")
     mapFor(regDef, query(db, _, _, whereClause, null))
   }
 
@@ -1592,8 +1592,8 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     withReadableDatabase(getMapFor(_, registerDefinition))
   }
 
-  override def getMapFor[R <: Register](registerDefinition: RegisterDefinition[R], filter: Field): scala.collection.Map[Key, R] = {
-    withReadableDatabase(getMapFor(_, registerDefinition, filter))
+  override def getMapFor[R <: Register](registerDefinition: RegisterDefinition[R], filters: Field*): scala.collection.Map[Key, R] = {
+    withReadableDatabase(getMapFor(_, registerDefinition, filters: _*))
   }
 
   override def getMapForCollection[R <: Register](registerDefinition: CollectibleRegisterDefinition[R], id: CollectionId): Map[Key, R] = {
@@ -1649,8 +1649,8 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
       db: SQLiteDatabase,
       sourceRegDef: RegisterDefinition[Register],
       targetRegDef: RegisterDefinition[R],
-      filter: Field,
-      sourceJoinFieldDefinition: ForeignKeyFieldDefinition): scala.collection.Map[Key, R] = {
+      sourceJoinFieldDefinition: ForeignKeyFieldDefinition,
+      filters: Field*): scala.collection.Map[Key, R] = {
 
     if (targetRegDef != sourceJoinFieldDefinition.target) {
       throw new AssertionError("Wrong register definition")
@@ -1665,11 +1665,12 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val sourceJoinFieldName = sourceTableName + '.' + fieldName(sourceRegDef, sourceJoinFieldDefinition)
     val targetJoinFieldName = targetTableName + '.' + SQLiteStorageManager.idKey
 
-    val filterFieldName = sourceTableName + '.' + fieldName(sourceRegDef, filter.definition)
-    val filterValue = sqlValue(filter)
+    val whereClause = filters.map(filter =>
+        s"$sourceTableName.${fieldName(sourceRegDef, filter.definition)}=${sqlValue(filter)}"
+    ).mkString(" AND ")
 
     val sqlQuery = s"SELECT $qualifiedColumns FROM $sourceTableName JOIN $targetTableName " +
-      s"ON $sourceJoinFieldName = $targetJoinFieldName WHERE $filterFieldName = $filterValue"
+      s"ON $sourceJoinFieldName = $targetJoinFieldName WHERE $whereClause"
     val cursor = query(db, sqlQuery)
 
     val result = scala.collection.mutable.Map[Key, R]()
@@ -1695,10 +1696,10 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   override def getForeignMap[R <: Register](
       regDef: RegisterDefinition[Register],
       targetRegDef: RegisterDefinition[R],
-      filter: Field,
-      sourceJoinFieldDefinition: ForeignKeyFieldDefinition): scala.collection.Map[Key, R] = {
+      sourceJoinFieldDefinition: ForeignKeyFieldDefinition,
+      filters: Field*): scala.collection.Map[Key, R] = {
 
-    withReadableDatabase(db => getForeignMap(db, regDef, targetRegDef, filter, sourceJoinFieldDefinition))
+    withReadableDatabase(db => getForeignMap(db, regDef, targetRegDef, sourceJoinFieldDefinition, filters: _*))
   }
 
   override def getJointSet[R <: Register](sourceRegDef: RegisterDefinition[Register], targetRegDef: RegisterDefinition[R], filter: ForeignKeyField, joinLeft: ForeignKeyFieldDefinition, joinRight: ForeignKeyFieldDefinition): Set[R] = {
