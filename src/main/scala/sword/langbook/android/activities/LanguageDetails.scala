@@ -40,8 +40,10 @@ class LanguageDetails extends BaseActivity {
         toolBar.setTitle(title)
       }
 
+      val wordCount = language.wordCount
+      val statistics = Vector(("Number of words", wordCount.toString))
       recyclerView.setLayoutManager(new LinearLayoutManager(this))
-      recyclerView.setAdapter(new LanguageDetailsAdapter(this, preferredLanguage, "", language.alphabets.toVector))
+      recyclerView.setAdapter(new LanguageDetailsAdapter(this, preferredLanguage, "", language.alphabets.toVector, statistics))
     }
   }
 }
