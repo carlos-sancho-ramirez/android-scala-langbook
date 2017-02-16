@@ -65,6 +65,23 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   }
   // End of duplicated code...
 
+  val fieldRegisterDefinitionsMap = (for {
+    regDef <- registerDefinitions
+    field <- regDef.fields
+  } yield {
+    (field, regDef)
+  }).toMap
+
+  val fieldName = fieldRegisterDefinitionsMap.map {
+    case (fieldDef, regDef) =>
+      (fieldDef, s"C${regDef.fields.indexOf(fieldDef)}")
+  }
+
+  val fieldQualifiedName = fieldRegisterDefinitionsMap.map {
+    case (fieldDef, regDef) =>
+      (fieldDef, s"${tableName(regDef)}.C${regDef.fields.indexOf(fieldDef)}")
+  }
+
   private def logi(message :String) = android.util.Log.i("DB", message)
 
   private def query(db: SQLiteDatabase, tableName: String, columns: Array[String], whereClause: String, orderByClause: String) = {
@@ -83,7 +100,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   }
 
   private def query(db: SQLiteDatabase, sqlQuery: String): Cursor = {
-    android.util.Log.i("DB", s"Executing query: $sqlQuery")
+    logi(s"Executing query: $sqlQuery")
     db.rawQuery(sqlQuery, null)
   }
 
@@ -95,9 +112,6 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   private def tableName(regDef :RegisterDefinition[Register]) :String = s"R${registerDefinitions.indexOf(regDef)}"
   private def tableName(reg :Register) :String = tableName(reg.definition)
 
-  private def fieldName(regDef :RegisterDefinition[Register], fieldDef :FieldDefinition) :String = s"C${regDef.fields.indexOf(fieldDef)}"
-  private def fieldName(regDef :RegisterDefinition[Register], field :Field) :String = fieldName(regDef, field.definition)
-
   private def createTables(db :SQLiteDatabase) = {
     for (regDef <- registerDefinitions) {
       val idKey = SQLiteStorageManager.idKey
@@ -107,7 +121,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
           case _ => "INTEGER"
         }
 
-        s"${fieldName(regDef, fieldDef)} $sqlType"
+        s"${fieldName(fieldDef)} $sqlType"
       }
       val columns = (regDef match {
         case _: CollectibleRegisterDefinition[_] => Seq(s"${SQLiteStorageManager.collKey} INTEGER") ++ fields
@@ -126,7 +140,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
       regDef.fields.collect {
         case f: ForeignKeyFieldDefinition => f
       }.foreach { f =>
-        val fName = fieldName(regDef, f)
+        val fName = fieldName(f)
         exec(db, s"CREATE INDEX IF NOT EXISTS ${tName}_$fName ON $tName($fName)")
       }
     }
@@ -997,8 +1011,10 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
           // with the same kana, we will assume that they are the same word, then no new word is
           // required, but the other one has to be reused.
           val jaWordOption = texts.get(kanaText).flatMap { kanaCollId =>
-            val values = getMapFor(db, registers.WordRepresentation, registers.WordRepresentation.SymbolArrayReferenceField(kanaCollId))
-                .filter(_._2.alphabet == kanaKey).map(_._2.word)
+            val values = getMapFor(db, registers.WordRepresentation,
+              registers.WordRepresentation.SymbolArrayReferenceField(kanaCollId),
+              registers.WordRepresentation.AlphabetReferenceField(kanaKey))
+              .map(_._2.word)
             if (values.size >= 2) throw new AssertionError(s"Found more than one word with the same kana '$kanaText'")
             values.headOption
           }
@@ -1069,7 +1085,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
         Array(SQLiteStorageManager.idKey, SQLiteStorageManager.collKey)
       case _ =>
         Array(SQLiteStorageManager.idKey)
-    }) ++ regDef.fields.map(fieldName(regDef,_))
+    }) ++ regDef.fields.map(fieldName)
 
     val cursor = f(tableName(regDef), array)
 
@@ -1100,13 +1116,13 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   }
 
   private def getMapFor[R <: Register](db: SQLiteDatabase, regDef: RegisterDefinition[R], filters: Field*): scala.collection.Map[Key, R] = {
-    val whereClause = filters.map(filter => s"${fieldName(regDef, filter)}=${sqlValue(filter)}").mkString(" AND ")
+    val whereClause = filters.map(filter => s"${fieldName(filter.definition)}=${sqlValue(filter)}").mkString(" AND ")
     mapFor(regDef, query(db, _, _, whereClause, null))
   }
 
   private def getMapForCollection[R <: Register](db: SQLiteDatabase,
       registerDefinition: CollectibleRegisterDefinition[R], id: CollectionId): Map[Key, R] = {
-    val keys = Seq(SQLiteStorageManager.idKey) ++ registerDefinition.fields.map(fieldName(registerDefinition,_))
+    val keys = Seq(SQLiteStorageManager.idKey) ++ registerDefinition.fields.map(fieldName)
     val cursor = query(db, tableName(registerDefinition), keys.toArray,
       s"${SQLiteStorageManager.collKey}=${id.toString}", null)
 
@@ -1143,7 +1159,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
   private def fromCursor[R <: Register](regDef :RegisterDefinition[R], cursor :Cursor) :R = {
     val fieldValues = for (fieldDef <- regDef.fields) yield {
-      cursor.getString(cursor.getColumnIndex(fieldName(regDef, fieldDef)))
+      cursor.getString(cursor.getColumnIndex(fieldName(fieldDef)))
     }
 
     regDef.from(fieldValues, keyExtractor).get
@@ -1151,7 +1167,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
   private case class GetParams(regDef: RegisterDefinition[Register]) {
     val table = tableName(regDef)
-    val columns = regDef.fields.map(fieldName(regDef,_)).toArray
+    val columns = regDef.fields.map(fieldName).toArray
   }
 
   private val getParams = registerDefinitions.map(regDef => (regDef, GetParams(regDef))).toMap
@@ -1193,7 +1209,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   private def find(db :SQLiteDatabase, reg :Register) :Seq[Key] = {
     val regDef = reg.definition
     val whereClause = reg.fields.map { field =>
-      s"${fieldName(regDef, field)}=${sqlValue(field)}"
+      s"${fieldName(field.definition)}=${sqlValue(field)}"
     }.mkString(" AND ")
     val cursor = query(db, tableName(regDef), Array(SQLiteStorageManager.idKey), whereClause, null)
 
@@ -1226,7 +1242,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   private def insert(db :SQLiteDatabase, register: Register): Option[Key] = {
     if (hasValidReference(db, register)) {
       val regDef = register.definition
-      val keys = regDef.fields.map(fieldName(regDef, _)).mkString(", ")
+      val keys = regDef.fields.map(fieldName).mkString(", ")
       val values = register.fields.map(sqlValue).mkString(", ")
       exec(db, s"INSERT INTO ${tableName(register)} ($keys) VALUES ($values)")
       find(db, register).lastOption
@@ -1242,7 +1258,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
   private def insert(db :SQLiteDatabase, coll :Register.CollectionId, register: Register): Unit = {
     val regDef = register.definition
-    val keys = regDef.fields.map(fieldName(regDef,_)).mkString(", ")
+    val keys = regDef.fields.map(fieldName).mkString(", ")
     val values = register.fields.map(sqlValue).mkString(", ")
     exec(db, s"INSERT INTO ${tableName(register)} (${SQLiteStorageManager.collKey}, $keys) VALUES ($coll, $values)")
   }
@@ -1250,7 +1266,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   private def insert(db: SQLiteDatabase, collId: Register.CollectionId, registers: Traversable[Register]): Unit = {
     if (VersionUtils.SQLite.isAtLeast3_7_11) {
       val regDef = registers.head.definition
-      val keys = regDef.fields.map(fieldName(regDef,_)).mkString(", ")
+      val keys = regDef.fields.map(fieldName).mkString(", ")
       val allValues = {
         (for (reg <- registers) yield {
           val values = reg.fields.map(sqlValue).mkString(", ")
@@ -1296,7 +1312,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     var id = maxId
     if (VersionUtils.SQLite.isAtLeast3_7_11) {
       val regDef = collections.head.head.definition
-      val keys = regDef.fields.map(fieldName(regDef,_)).mkString(", ")
+      val keys = regDef.fields.map(fieldName).mkString(", ")
 
       val allValues = (for (registers <- collections) yield {
         id += 1
@@ -1353,13 +1369,13 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   }
 
   private def keysFor(db :SQLiteDatabase, regDef :RegisterDefinition[Register], filter: Field) :Set[Key] = {
-    keysFor(db, regDef, s"${fieldName(regDef, filter)}=${sqlValue(filter)}")
+    keysFor(db, regDef, s"${fieldName(filter.definition)}=${sqlValue(filter)}")
   }
 
   private def replace(db: SQLiteDatabase, register: Register, key: Key): Boolean = {
     val currentOption = get(db, key)
     if (currentOption.isDefined) {
-      val expr = register.fields.map(f => s"${fieldName(register.definition, f)}=${sqlValue(f)}")
+      val expr = register.fields.map(f => s"${fieldName(f.definition)}=${sqlValue(f)}")
         .mkString(", ")
       exec(db, s"UPDATE ${tableName(key.registerDefinition)} SET $expr WHERE ${
         SQLiteStorageManager.idKey
@@ -1371,7 +1387,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
   }
 
   private def existReference(db :SQLiteDatabase, key: Key, referencerRegDef: RegisterDefinition[Register], referencerFieldDef: ForeignKeyFieldDefinition): Boolean = {
-    val whereClause = s"${fieldName(referencerRegDef, referencerFieldDef)}=${key.index}"
+    val whereClause = s"${fieldName(referencerFieldDef)}=${key.index}"
     val cursor = query(db, tableName(referencerRegDef), Array(SQLiteStorageManager.idKey), whereClause, null)
 
     if (cursor == null) false
@@ -1450,7 +1466,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
   private case class GetCollectionParams(regDef: RegisterDefinition[Register]) {
     val table = tableName(regDef)
-    val columns = regDef.fields.map(fieldName(regDef, _)).toArray
+    val columns = regDef.fields.map(fieldName).toArray
     val columnIndices = columns.indices
   }
 
@@ -1481,7 +1497,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
 
   private case class GetArrayParams(regDef: ArrayableRegisterDefinition[Register]) {
     val table = tableName(regDef)
-    val columns = regDef.fields.map(fieldName(regDef, _)).toArray
+    val columns = regDef.fields.map(fieldName).toArray
     val columnIndices = columns.indices
   }
 
@@ -1617,10 +1633,10 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val wordTableName = tableName(wordTable)
     val reprTableName = tableName(reprTable)
 
-    val alphabetFieldName = fieldName(reprTable, reprTable.AlphabetReferenceField)
-    val languageFieldName = fieldName(wordTable, language.definition)
+    val alphabetFieldName = fieldName(reprTable.AlphabetReferenceField)
+    val languageFieldName = fieldName(language.definition)
 
-    val wordRefFieldName = fieldName(reprTable, wordRefFieldDef)
+    val wordRefFieldName = fieldName(wordRefFieldDef)
     val languageKey = language.key.index
 
     val sqlQuery = s"SELECT $reprTableName.$alphabetFieldName FROM $reprTableName JOIN $wordTableName ON $wordTableName.${SQLiteStorageManager.idKey} = $reprTableName.$wordRefFieldName WHERE $wordTableName.$languageFieldName = $languageKey"
@@ -1659,14 +1675,14 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val sourceTableName = tableName(sourceRegDef)
     val targetTableName = tableName(sourceJoinFieldDefinition.target)
 
-    val columns = SQLiteStorageManager.idKey +: targetRegDef.fields.map(fieldName(targetRegDef, _))
+    val columns = SQLiteStorageManager.idKey +: targetRegDef.fields.map(fieldName)
     val qualifiedColumns = columns.map(targetTableName + '.' + _).mkString(", ")
 
-    val sourceJoinFieldName = sourceTableName + '.' + fieldName(sourceRegDef, sourceJoinFieldDefinition)
+    val sourceJoinFieldName = sourceTableName + '.' + fieldName(sourceJoinFieldDefinition)
     val targetJoinFieldName = targetTableName + '.' + SQLiteStorageManager.idKey
 
     val whereClause = filters.map(filter =>
-        s"$sourceTableName.${fieldName(sourceRegDef, filter.definition)}=${sqlValue(filter)}"
+        s"$sourceTableName.${fieldName(filter.definition)}=${sqlValue(filter)}"
     ).mkString(" AND ")
 
     val sqlQuery = s"SELECT $qualifiedColumns FROM $sourceTableName JOIN $targetTableName " +
@@ -1707,12 +1723,12 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val sourceTableName = tableName(sourceRegDef)
     val targetTableName = tableName(targetRegDef)
 
-    val allColumns = targetRegDef.fields.map(f => targetTableName + '.' + fieldName(targetRegDef, f)).mkString(", ")
+    val allColumns = targetRegDef.fields.map(f => targetTableName + '.' + fieldName(f)).mkString(", ")
 
-    val sourceJoinFieldName = sourceTableName + '.' + fieldName(sourceRegDef, joinLeft)
-    val targetJoinFieldName = targetTableName + '.' + fieldName(targetRegDef, joinRight)
+    val sourceJoinFieldName = sourceTableName + '.' + fieldName(joinLeft)
+    val targetJoinFieldName = targetTableName + '.' + fieldName(joinRight)
 
-    val filterFieldName = sourceTableName + '.' + fieldName(sourceRegDef, filter.definition)
+    val filterFieldName = sourceTableName + '.' + fieldName(filter.definition)
     val filterKey = filter.key.index
 
     val sqlQuery = s"SELECT $allColumns FROM $sourceTableName JOIN $targetTableName ON $sourceJoinFieldName = $targetJoinFieldName WHERE $filterFieldName = $filterKey"
@@ -1745,10 +1761,10 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val wordTable = redundant.RedundantWord
     val wordTableName = tableName(wordTable)
 
-    val originalWordRefFieldName = fieldName(wordTable, redundant.RedundantWord.OriginalWordReferenceField)
-    val redundantWordRefFieldName = fieldName(wordTextTable, wordTextTable.RedundantWordReferenceField)
-    val charSequenceFieldName = fieldName(textTable, textTable.CharSequenceField)
-    val textRefFieldName = fieldName(wordTextTable, wordTextTable.TextReferenceField)
+    val originalWordRefFieldName = fieldName(redundant.RedundantWord.OriginalWordReferenceField)
+    val redundantWordRefFieldName = fieldName(wordTextTable.RedundantWordReferenceField)
+    val charSequenceFieldName = fieldName(textTable.CharSequenceField)
+    val textRefFieldName = fieldName(wordTextTable.TextReferenceField)
 
     val sqlQuery = s"SELECT $wordTableName.$originalWordRefFieldName,$textTableName.$charSequenceFieldName FROM $wordTextTableName " +
       s"JOIN $textTableName ON $wordTextTableName.$textRefFieldName = $textTableName.${SQLiteStorageManager.idKey} " +
@@ -1786,12 +1802,12 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val wordTable = redundant.RedundantWord
     val wordTableName = tableName(wordTable)
 
-    val originalWordRefFieldName = fieldName(wordTable, redundant.RedundantWord.OriginalWordReferenceField)
-    val bunchRefFieldName = fieldName(resolvedBunchTable, redundant.ResolvedBunch.BunchReferenceField)
-    val bunchWordRefFieldName = fieldName(resolvedBunchTable, redundant.ResolvedBunch.RedundantWordReferenceField)
-    val redundantWordRefFieldName = fieldName(wordTextTable, wordTextTable.RedundantWordReferenceField)
-    val charSequenceFieldName = fieldName(textTable, textTable.CharSequenceField)
-    val textRefFieldName = fieldName(wordTextTable, wordTextTable.TextReferenceField)
+    val originalWordRefFieldName = fieldName(redundant.RedundantWord.OriginalWordReferenceField)
+    val bunchRefFieldName = fieldName(redundant.ResolvedBunch.BunchReferenceField)
+    val bunchWordRefFieldName = fieldName(redundant.ResolvedBunch.RedundantWordReferenceField)
+    val redundantWordRefFieldName = fieldName(wordTextTable.RedundantWordReferenceField)
+    val charSequenceFieldName = fieldName(textTable.CharSequenceField)
+    val textRefFieldName = fieldName(wordTextTable.TextReferenceField)
 
     val sqlQuery = s"SELECT $wordTableName.$originalWordRefFieldName,$textTableName.$charSequenceFieldName FROM $resolvedBunchTableName " +
       s"JOIN $wordTextTableName ON $resolvedBunchTableName.$bunchWordRefFieldName = $wordTextTableName.$redundantWordRefFieldName " +
@@ -1829,11 +1845,11 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val conceptTableName = tableName(acceptationTable)
     val reprTableName = tableName(reprTable)
 
-    val conceptWordFieldName = fieldName(acceptationTable, acceptationTable.WordReferenceField)
-    val reprWordFieldName = fieldName(reprTable, reprTable.WordReferenceField)
+    val conceptWordFieldName = fieldName(acceptationTable.WordReferenceField)
+    val reprWordFieldName = fieldName(reprTable.WordReferenceField)
 
-    val conceptFieldName = fieldName(acceptationTable, acceptationTable.ConceptReferenceField)
-    val alphabetFieldName = fieldName(reprTable, reprTable.AlphabetReferenceField)
+    val conceptFieldName = fieldName(acceptationTable.ConceptReferenceField)
+    val alphabetFieldName = fieldName(reprTable.AlphabetReferenceField)
 
     val alphabetKey = alphabet.index
 
@@ -1876,14 +1892,14 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     val reprTableName = tableName(reprTable)
     val symbolPositionTableName = tableName(symbolPositionTable)
 
-    val arrayRefFieldName = fieldName(reprTable, reprTable.SymbolArrayReferenceField)
+    val arrayRefFieldName = fieldName(reprTable.SymbolArrayReferenceField)
 
     val targetTableName = tableName(targetRegDef)
-    val targetFieldName = fieldName(targetRegDef, targetFieldDef)
+    val targetFieldName = fieldName(targetFieldDef)
     val target = s"$targetTableName.$targetFieldName"
 
     val filterTableName = tableName(filterRegDef)
-    val filterFieldName = fieldName(filterRegDef, filter.definition)
+    val filterFieldName = fieldName(filter.definition)
     val filterId = filter.key.index
     val filterClause = s"$filterTableName.$filterFieldName = $filterId"
 
