@@ -5,27 +5,23 @@ import android.view.{View, ViewGroup}
 import sword.langbook.android.viewholders._
 import sword.langbook.db.{Language, Word}
 
-case class WordDetailsAdapter(activity: BaseActivity, alphabets: IndexedSeq[String], language: Language,
-    acceptations: IndexedSeq[String], bunches: IndexedSeq[String], synonyms: IndexedSeq[Word],
-    translations: IndexedSeq[Word], morphologies: Map[String, String]) extends RecyclerView.Adapter[BaseViewHolder] {
+case class WordDetailsAdapter(
+    activity: BaseActivity,
+    acceptations: IndexedSeq[String],
+    language: Language,
+    representations: IndexedSeq[String],
+    synonyms: IndexedSeq[Word],
+    translations: IndexedSeq[Word],
+    bunches: IndexedSeq[String],
+    morphologies: Map[String, String]) extends RecyclerView.Adapter[BaseViewHolder] {
 
-  val alphabetsSectionCount = {
-    val size = alphabets.size
-    if (size > 1) 1 + size else 0
-  }
+  val acceptationsSectionCount = acceptations.size
 
-  val languageSectionCount = 2
+  val languageSectionCount = 1
 
-  val acceptationsSectionCount = {
-    val size = acceptations.size
-    if (size > 0) 1 + size
-    else 0
-  }
-
-  val bunchesSectionCount = {
-    val size = bunches.size
-    if (size > 0) 1 + size
-    else 0
+  val representationSectionCount = {
+    val size = representations.size
+    if (size > 0) 1 + size else 0
   }
 
   val synonymsSectionCount = {
@@ -40,6 +36,12 @@ case class WordDetailsAdapter(activity: BaseActivity, alphabets: IndexedSeq[Stri
     else 0
   }
 
+  val bunchesSectionCount = {
+    val size = bunches.size
+    if (size > 0) 1 + size
+    else 0
+  }
+
   val morphologiesSectionCount = {
     val size = morphologies.size
     if (size > 0) 1 + size
@@ -48,60 +50,67 @@ case class WordDetailsAdapter(activity: BaseActivity, alphabets: IndexedSeq[Stri
 
   // TODO: This titles should not be hardcoded
   object sectionTitles {
-    val alphabets = "Alphabets"
-    val language = "Language"
     val acceptations = "Acceptations"
-    val bunches = "Bunches"
+    val language = "Language"
+    val representations = "Alternatives"
     val synonyms = "Synonyms"
     val translations = "Translations"
+    val bunches = "Bunches"
     val morphologies = "Morphologies"
   }
 
-  val sectionHeaderPositions = {
+  val (sectionHeaderPositions, sectionContentStartPositions) = {
     var currentPos = 0
-    val map = scala.collection.mutable.Map[Int, String]()
-
-    if (alphabetsSectionCount > 0) {
-      map += currentPos -> sectionTitles.alphabets
-      currentPos += alphabetsSectionCount
-    }
-
-    if (languageSectionCount > 0) {
-      map += currentPos -> sectionTitles.language
-      currentPos += languageSectionCount
-    }
+    val headerMap = scala.collection.mutable.Map[Int, String]()
+    val contentMap = scala.collection.mutable.Map[Int, String]()
 
     if (acceptationsSectionCount > 0) {
-      map += currentPos -> sectionTitles.acceptations
+      contentMap += currentPos -> sectionTitles.acceptations
       currentPos += acceptationsSectionCount
     }
 
-    if (bunchesSectionCount > 0) {
-      map += currentPos -> sectionTitles.bunches
-      currentPos += bunchesSectionCount
+    if (languageSectionCount > 0) {
+      contentMap += currentPos -> sectionTitles.language
+      currentPos += languageSectionCount
+    }
+
+    if (representationSectionCount > 0) {
+      headerMap += currentPos -> sectionTitles.representations
+      contentMap += (currentPos + 1) -> sectionTitles.representations
+      currentPos += representationSectionCount
     }
 
     if (synonymsSectionCount > 0) {
-      map += currentPos -> sectionTitles.synonyms
+      headerMap += currentPos -> sectionTitles.synonyms
+      contentMap += (currentPos + 1) -> sectionTitles.synonyms
       currentPos += synonymsSectionCount
     }
 
     if (translationsSectionCount > 0) {
-      map += currentPos -> sectionTitles.translations
+      headerMap += currentPos -> sectionTitles.translations
+      contentMap += (currentPos + 1) -> sectionTitles.translations
       currentPos += translationsSectionCount
     }
 
+    if (bunchesSectionCount > 0) {
+      headerMap += currentPos -> sectionTitles.bunches
+      contentMap += (currentPos + 1) -> sectionTitles.bunches
+      currentPos += bunchesSectionCount
+    }
+
     if (morphologiesSectionCount > 0) {
-      map += currentPos -> sectionTitles.morphologies
+      headerMap += currentPos -> sectionTitles.morphologies
+      contentMap += (currentPos + 1) -> sectionTitles.morphologies
       currentPos += morphologiesSectionCount
     }
 
-    map.toMap
+    (headerMap.toMap, contentMap.toMap)
   }
 
   override val getItemCount = {
-    alphabetsSectionCount + languageSectionCount + synonymsSectionCount + translationsSectionCount +
-      acceptationsSectionCount + bunchesSectionCount + morphologiesSectionCount
+    acceptationsSectionCount + languageSectionCount + representationSectionCount +
+      synonymsSectionCount + translationsSectionCount +
+      bunchesSectionCount + morphologiesSectionCount
   }
 
   override def getItemViewType(position: Int) = {
@@ -121,14 +130,14 @@ case class WordDetailsAdapter(activity: BaseActivity, alphabets: IndexedSeq[Stri
       case holder: SectionHeaderViewHolder =>
         holder.textView.setText(sectionHeaderPositions(position))
       case holder: SectionEntryViewHolder =>
-        val currentHeaderPosition = sectionHeaderPositions.keys.filter(_ < position).max
-        val currentSection = sectionHeaderPositions(currentHeaderPosition)
-        val relPosition = position - currentHeaderPosition - 1
+        val sectionStartPosition = sectionContentStartPositions.keys.filter(_ <= position).max
+        val currentSection = sectionContentStartPositions(sectionStartPosition)
+        val relPosition = position - sectionStartPosition
 
         val text = currentSection match {
-          case sectionTitles.alphabets =>
+          case sectionTitles.acceptations =>
             holder.textView.setClickable(false)
-            alphabets(relPosition)
+            acceptations(relPosition)
           case sectionTitles.language =>
             holder.textView.setClickable(true)
             holder.textView.setOnClickListener(new View.OnClickListener() {
@@ -137,12 +146,9 @@ case class WordDetailsAdapter(activity: BaseActivity, alphabets: IndexedSeq[Stri
               }
             })
             language.suitableTextForLanguage(activity.preferredLanguage).getOrElse("")
-          case sectionTitles.acceptations =>
+          case sectionTitles.representations =>
             holder.textView.setClickable(false)
-            acceptations(relPosition)
-          case sectionTitles.bunches =>
-            holder.textView.setClickable(false)
-            bunches(relPosition)
+            representations(relPosition)
           case sectionTitles.synonyms =>
             val synonym = synonyms(relPosition)
             holder.textView.setClickable(true)
@@ -161,6 +167,9 @@ case class WordDetailsAdapter(activity: BaseActivity, alphabets: IndexedSeq[Stri
               }
             })
             translation.suitableText.getOrElse("")
+          case sectionTitles.bunches =>
+            holder.textView.setClickable(false)
+            bunches(relPosition)
           case sectionTitles.morphologies =>
             holder.textView.setClickable(false)
             val pair = morphologies.toList(relPosition)

@@ -1718,8 +1718,7 @@ class SQLiteStorageManager(context :Context, dbName: String, override val regist
     withReadableDatabase(db => getForeignMap(db, regDef, targetRegDef, sourceJoinFieldDefinition, filters: _*))
   }
 
-  override def getJointSet[R <: Register](sourceRegDef: RegisterDefinition[Register], targetRegDef: RegisterDefinition[R], filter: ForeignKeyField, joinLeft: ForeignKeyFieldDefinition, joinRight: ForeignKeyFieldDefinition): Set[R] = {
-
+  override def getJointSet[R <: Register](sourceRegDef: RegisterDefinition[Register], targetRegDef: RegisterDefinition[R], filter: ForeignKeyField, joinLeft: FieldDefinition, joinRight: FieldDefinition): Set[R] = {
     val sourceTableName = tableName(sourceRegDef)
     val targetTableName = tableName(targetRegDef)
 

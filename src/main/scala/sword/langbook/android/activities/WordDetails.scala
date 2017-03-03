@@ -5,8 +5,9 @@ import android.content.Intent
 import android.os.Bundle
 import android.support.v7.widget.{LinearLayoutManager, Toolbar}
 import android.util.Log
-import android.view.{MenuItem, Menu}
-import sword.langbook.android.{TR, R}
+import android.view.{Menu, MenuItem}
+import sword.langbook.android.{R, TR}
+import sword.langbook.db.{redundant, registers}
 import sword.langbook.db.Word
 
 object WordDetails {
@@ -24,7 +25,8 @@ object WordDetails {
 
 class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
 
-  lazy val wordKeyOption = linkedDb.storageManager.decode(getIntent.getStringExtra(BundleKeys.wordKey))
+  lazy val storageManager = linkedDb.storageManager
+  lazy val wordKeyOption = storageManager.decode(getIntent.getStringExtra(BundleKeys.wordKey))
   lazy val wordOption = wordKeyOption.flatMap(linkedDb.words.get)
 
   override def onCreate(savedInstanceState :Bundle) :Unit = {
@@ -48,10 +50,13 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
     for (word <- wordOption) {
       val language = word.language
 
-      val alphabetStrings = word.text.flatMap {
-        case (alphabet, thisText) =>
-          alphabet.suitableTextForLanguage(preferredLanguage).map(alphabetText => s"$alphabetText: $thisText")
-      }.toVector
+      val alternatives :IndexedSeq[String] = if (wordKeyOption.isDefined) {
+        val regDef = registers.WordRepresentation
+        val field = regDef.WordReferenceField(wordKeyOption.get)
+        storageManager.getJointSet(regDef, redundant.Text, field, regDef.SymbolArrayReferenceField, redundant.Text.SymbolArrayReferenceField)
+          .map(_.text).toVector
+      }
+      else IndexedSeq()
 
       val acceptations = word.concepts.flatMap(_.isTypeOf)
           .flatMap(_.wordsForLanguage(preferredLanguage).headOption)
@@ -62,8 +67,8 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
       val translations = word.translations.toVector
       val morphologies = word.morphologies
 
-      findView(TR.recyclerView).setAdapter(new WordDetailsAdapter(this, alphabetStrings, language,
-        acceptations, bunches, synonyms, translations, morphologies))
+      findView(TR.recyclerView).setAdapter(new WordDetailsAdapter(this, acceptations, language,
+        alternatives, synonyms, translations, bunches, morphologies))
     }
   }
 
