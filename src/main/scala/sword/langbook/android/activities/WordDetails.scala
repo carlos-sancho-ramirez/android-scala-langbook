@@ -6,17 +6,26 @@ import android.os.Bundle
 import android.support.v7.widget.{LinearLayoutManager, Toolbar}
 import android.util.Log
 import android.view.{Menu, MenuItem}
+import sword.db.StorageManager
 import sword.langbook.android.{R, TR}
-import sword.langbook.db.{redundant, registers}
-import sword.langbook.db.Word
+import sword.langbook.db.{Concept, Word, redundant, registers}
 
 object WordDetails {
   private val className = "sword.langbook.android.activities.WordDetails"
 
-  def openWith(activity :Activity, requestCode :Int, word :Word) = {
+  def openWith(activity :Activity, requestCode :Int, word: Word) = {
     val intent = new Intent()
     intent.setClassName(activity, className)
     intent.putExtra(BundleKeys.wordKey, word.key.encoded)
+
+    if (requestCode > 0) activity.startActivityForResult(intent, requestCode)
+    else activity.startActivity(intent)
+  }
+
+  def openWith(activity :Activity, requestCode :Int, acceptationKey: StorageManager.Key) = {
+    val intent = new Intent()
+    intent.setClassName(activity, className)
+    intent.putExtra(BundleKeys.acceptationKey, acceptationKey.encoded)
 
     if (requestCode > 0) activity.startActivityForResult(intent, requestCode)
     else activity.startActivity(intent)
@@ -26,7 +35,15 @@ object WordDetails {
 class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
 
   lazy val storageManager = linkedDb.storageManager
-  lazy val wordKeyOption = storageManager.decode(getIntent.getStringExtra(BundleKeys.wordKey))
+  lazy val acceptationKeyOption = storageManager.decode(getIntent.getStringExtra(BundleKeys.acceptationKey))
+  lazy val wordKeyOption = {
+    val fromAcceptation = acceptationKeyOption.flatMap(storageManager.get).collect {
+      case reg: registers.Acceptation => reg.word
+    }
+
+    if (fromAcceptation.isDefined) fromAcceptation
+    else storageManager.decode(getIntent.getStringExtra(BundleKeys.wordKey))
+  }
   lazy val wordOption = wordKeyOption.flatMap(linkedDb.words.get)
 
   override def onCreate(savedInstanceState :Bundle) :Unit = {
@@ -58,16 +75,41 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
       }
       else IndexedSeq()
 
-      val acceptations = word.concepts.flatMap(_.isTypeOf)
-          .flatMap(_.wordsForLanguage(preferredLanguage).headOption)
-          .flatMap(_.suitableText).toVector
+      val givenAcceptation = acceptationKeyOption.flatMap(key => storageManager.get(key).map(reg => (key, reg.asInstanceOf[registers.Acceptation])))
+      val acceptations = {
+        if (givenAcceptation.isDefined) Vector(givenAcceptation.get)
+        else {
+          val regDef = registers.Acceptation
+          val field = regDef.WordReferenceField(wordKeyOption.get)
+          storageManager.getMapFor(regDef, field).toVector
+        }
+      }
+
+      val definitions = acceptations.map { case (accKey, acc) =>
+        Concept(acc.concept).isTypeOf.headOption.flatMap(_.wordsForLanguage(preferredLanguage).headOption)
+          .flatMap(_.suitableText).getOrElse("")
+      }
+
+      val accRepr = for {
+        (accKey, acc) <- acceptations
+        text <- {
+          val regDef = registers.AcceptationRepresentation
+          val field = regDef.AcceptationReferenceField(accKey)
+          storageManager.getJointSet(regDef, redundant.Text, field, regDef.SymbolArrayReferenceField, redundant.Text.SymbolArrayReferenceField)
+            .map(_.text).headOption
+        }
+      } yield text
+
+      Log.i(getClass.getSimpleName, s" ---> definitions: $definitions")
+      Log.i(getClass.getSimpleName, s" ---> accRepr: $accRepr")
+      val defs = definitions zip accRepr map { case (definition, repr) => s"[$repr] $definition"}
 
       val bunches = word.bunches.map(_.name).toVector
       val synonyms = word.synonyms.toVector
       val translations = word.translations.toVector
       val morphologies = word.morphologies
 
-      findView(TR.recyclerView).setAdapter(new WordDetailsAdapter(this, acceptations, language,
+      findView(TR.recyclerView).setAdapter(new WordDetailsAdapter(this, defs, language,
         alternatives, synonyms, translations, bunches, morphologies))
     }
   }
