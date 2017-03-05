@@ -1,13 +1,15 @@
 package sword.langbook.android.activities
 
 import android.support.v7.widget.RecyclerView
+import android.view.View.OnClickListener
 import android.view.{View, ViewGroup}
+import sword.db.StorageManager
 import sword.langbook.android.viewholders._
 import sword.langbook.db.{Language, Word}
 
 case class WordDetailsAdapter(
     activity: BaseActivity,
-    acceptations: IndexedSeq[String],
+    acceptations: IndexedSeq[(StorageManager.Key, String)],
     language: Language,
     representations: IndexedSeq[String],
     synonyms: IndexedSeq[Word],
@@ -136,8 +138,19 @@ case class WordDetailsAdapter(
 
         val text = currentSection match {
           case sectionTitles.acceptations =>
-            holder.textView.setClickable(false)
-            acceptations(relPosition)
+            val acc = acceptations(relPosition)
+
+            val textView = holder.textView
+            if (acc._1 != null) {
+              textView.setOnClickListener(new OnClickListener {
+                override def onClick(v: View): Unit = {
+                  WordDetails.openWith(activity, RequestCodes.checkWordDetails, acc._1)
+                }
+              })
+            }
+            else textView.setClickable(false)
+
+            acceptations(relPosition)._2
           case sectionTitles.language =>
             holder.textView.setClickable(true)
             holder.textView.setOnClickListener(new View.OnClickListener() {

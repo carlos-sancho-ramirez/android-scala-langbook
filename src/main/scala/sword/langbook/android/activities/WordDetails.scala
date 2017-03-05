@@ -4,7 +4,6 @@ import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.support.v7.widget.{LinearLayoutManager, Toolbar}
-import android.util.Log
 import android.view.{Menu, MenuItem}
 import sword.db.StorageManager
 import sword.langbook.android.{R, TR}
@@ -98,11 +97,18 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
           storageManager.getJointSet(regDef, redundant.Text, field, regDef.SymbolArrayReferenceField, redundant.Text.SymbolArrayReferenceField)
             .map(_.text).headOption
         }
-      } yield text
+      } yield (accKey, text)
 
-      Log.i(getClass.getSimpleName, s" ---> definitions: $definitions")
-      Log.i(getClass.getSimpleName, s" ---> accRepr: $accRepr")
-      val defs = definitions zip accRepr map { case (definition, repr) => s"[$repr] $definition"}
+      val defs: Vector[(StorageManager.Key, String)] = {
+        definitions zip accRepr map { case (definition, (accKey, repr)) =>
+          val resultAcc = {
+            if (acceptationKeyOption.isDefined) null
+            else accKey
+          }
+
+          (resultAcc, s"[$repr] $definition")
+        }
+      }
 
       val bunches = word.bunches.map(_.name).toVector
       val synonyms = word.synonyms.toVector
