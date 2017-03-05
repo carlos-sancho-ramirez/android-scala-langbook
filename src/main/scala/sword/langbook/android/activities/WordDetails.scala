@@ -53,13 +53,23 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
   }
 
   def updateUi(): Unit = {
-    val title = wordOption.flatMap(_.suitableText).getOrElse(getString(R.string.appName))
+    val title = acceptationKeyOption.flatMap(firstAcceptationRepresentation).getOrElse {
+      wordOption.flatMap(_.suitableText).getOrElse(getString(R.string.appName))
+    }
+
     val toolBar = findView(TR.toolBar)
     toolBar.setTitle(title)
     toolBar.setOnMenuItemClickListener(this)
     updateMenu(toolBar.getMenu)
 
     updateAdapter()
+  }
+
+  private def firstAcceptationRepresentation(accKey: StorageManager.Key): Option[String] = {
+    val regDef = registers.AcceptationRepresentation
+    val field = regDef.AcceptationReferenceField(accKey)
+    storageManager.getJointSet(regDef, redundant.Text, field, regDef.SymbolArrayReferenceField, redundant.Text.SymbolArrayReferenceField)
+      .map(_.text).headOption
   }
 
   def updateAdapter(): Unit = {
@@ -91,12 +101,7 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
 
       val accRepr = for {
         (accKey, acc) <- acceptations
-        text <- {
-          val regDef = registers.AcceptationRepresentation
-          val field = regDef.AcceptationReferenceField(accKey)
-          storageManager.getJointSet(regDef, redundant.Text, field, regDef.SymbolArrayReferenceField, redundant.Text.SymbolArrayReferenceField)
-            .map(_.text).headOption
-        }
+        text <- firstAcceptationRepresentation(accKey)
       } yield (accKey, text)
 
       val defs: Vector[(StorageManager.Key, String)] = {
