@@ -5,15 +5,15 @@ import android.view.View.OnClickListener
 import android.view.{View, ViewGroup}
 import sword.db.StorageManager
 import sword.langbook.android.viewholders._
-import sword.langbook.db.{Language, Word}
+import sword.langbook.db.{Acceptation, Language}
 
 case class WordDetailsAdapter(
     activity: BaseActivity,
     acceptations: IndexedSeq[(StorageManager.Key, String)],
     language: Language,
     representations: IndexedSeq[String],
-    synonyms: IndexedSeq[Word],
-    translations: IndexedSeq[Word],
+    synonyms: IndexedSeq[Acceptation],
+    translations: IndexedSeq[Acceptation],
     bunches: IndexedSeq[String],
     morphologies: Map[String, String]) extends RecyclerView.Adapter[BaseViewHolder] {
 
@@ -167,7 +167,7 @@ case class WordDetailsAdapter(
             holder.textView.setClickable(true)
             holder.textView.setOnClickListener(new View.OnClickListener() {
               override def onClick(v: View): Unit = {
-                WordDetails.openWith(activity, RequestCodes.checkWordDetails, synonym)
+                WordDetails.openWith(activity, RequestCodes.checkWordDetails, synonym.key)
               }
             })
             synonym.suitableText.getOrElse("")
@@ -176,7 +176,7 @@ case class WordDetailsAdapter(
             holder.textView.setClickable(true)
             holder.textView.setOnClickListener(new View.OnClickListener() {
               override def onClick(v: View): Unit = {
-                WordDetails.openWith(activity, RequestCodes.checkWordDetails, translation)
+                WordDetails.openWith(activity, RequestCodes.checkWordDetails, translation.key)
               }
             })
             translation.suitableText.getOrElse("")

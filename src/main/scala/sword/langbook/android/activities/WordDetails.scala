@@ -7,7 +7,7 @@ import android.support.v7.widget.{LinearLayoutManager, Toolbar}
 import android.view.{Menu, MenuItem}
 import sword.db.StorageManager
 import sword.langbook.android.{R, TR}
-import sword.langbook.db.{Concept, Word, redundant, registers}
+import sword.langbook.db._
 
 object WordDetails {
   private val className = "sword.langbook.android.activities.WordDetails"
@@ -35,6 +35,8 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
 
   lazy val storageManager = linkedDb.storageManager
   lazy val acceptationKeyOption = storageManager.decode(getIntent.getStringExtra(BundleKeys.acceptationKey))
+  lazy val acceptationOption = acceptationKeyOption.map(key => Acceptation(key))
+
   lazy val wordKeyOption = {
     val fromAcceptation = acceptationKeyOption.flatMap(storageManager.get).collect {
       case reg: registers.Acceptation => reg.word
@@ -53,7 +55,7 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
   }
 
   def updateUi(): Unit = {
-    val title = acceptationKeyOption.flatMap(firstAcceptationRepresentation).getOrElse {
+    val title = acceptationOption.flatMap(_.suitableText).getOrElse {
       wordOption.flatMap(_.suitableText).getOrElse(getString(R.string.appName))
     }
 
@@ -63,13 +65,6 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
     updateMenu(toolBar.getMenu)
 
     updateAdapter()
-  }
-
-  private def firstAcceptationRepresentation(accKey: StorageManager.Key): Option[String] = {
-    val regDef = registers.AcceptationRepresentation
-    val field = regDef.AcceptationReferenceField(accKey)
-    storageManager.getJointSet(regDef, redundant.Text, field, regDef.SymbolArrayReferenceField, redundant.Text.SymbolArrayReferenceField)
-      .map(_.text).headOption
   }
 
   def updateAdapter(): Unit = {
@@ -94,6 +89,13 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
         }
       }
 
+      // Behaviour of this Activity is different if it was providing an acceptation instead of
+      // a word, or if the word has only one acceptation.
+      //
+      // If there is only one acceptation synonyms and translations may be displayed for this
+      // concept. But if there is more than one concept we cannot because concepts would be mixed.
+      val showingAcceptation = acceptations.size == 1
+
       val definitions = acceptations.map { case (accKey, acc) =>
         Concept(acc.concept).isTypeOf.headOption.flatMap(_.wordsForLanguage(preferredLanguage).headOption)
           .flatMap(_.suitableText).getOrElse("")
@@ -101,7 +103,7 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
 
       val accRepr = for {
         (accKey, acc) <- acceptations
-        text <- firstAcceptationRepresentation(accKey)
+        text <- Acceptation(accKey).anyAcceptationRepresentation
       } yield (accKey, text)
 
       val defs: Vector[(StorageManager.Key, String)] = {
@@ -115,9 +117,22 @@ class WordDetails extends BaseActivity with Toolbar.OnMenuItemClickListener {
         }
       }
 
+      val resultAcceptation = {
+        if (showingAcceptation) acceptations.headOption.map(pair => Acceptation(pair._1))
+        else None
+      }
+
       val bunches = word.bunches.map(_.name).toVector
-      val synonyms = word.synonyms.toVector
-      val translations = word.translations.toVector
+      val synonyms = {
+        if (resultAcceptation.isDefined) resultAcceptation.get.synonyms.toVector
+        else Vector[Acceptation]()
+      }
+
+      val translations = {
+        if (resultAcceptation.isDefined) resultAcceptation.get.translations.toVector
+        else Vector[Acceptation]()
+      }
+
       val morphologies = word.morphologies
 
       findView(TR.recyclerView).setAdapter(new WordDetailsAdapter(this, defs, language,
